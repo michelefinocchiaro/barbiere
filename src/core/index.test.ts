@@ -104,13 +104,25 @@ Ci vediamo alle {ora}`
     const testo = componiPromemoria(modello, { quando: 'martedì', ora: '8.15' })
     const link = linkWhatsApp('393331234567', testo)
     const url = new URL(link)
-    const decoded = decodeURIComponent(url.searchParams.get('text')!)
+    const decoded = url.searchParams.get('text')!
 
+    expect(link).toBe(
+      `https://api.whatsapp.com/send/?phone=393331234567&text=${encodeURIComponent(testo)}`,
+    )
     expect(decoded).toBe(testo)
     expect(decoded).toContain('Ciao friend ti ricordiamo l’appuntamento di martedì')
     expect((link.match(/%0A/g) ?? []).length).toBe(2)
     expect(link).toContain('%E2%80%99')
     expect(decoded.includes('💇🏻‍♂️')).toBe(true)
+  })
+
+  it('con il testo standard del negozio il parametro text è identico byte per byte', () => {
+    const testo = componiPromemoria(impostazioniNegozio.testoPromemoria, {
+      quando: 'martedì',
+      ora: '8.15',
+    })
+    const link = linkWhatsApp('393330000001', testo)
+    expect(new URL(link).searchParams.get('text')).toBe(testo)
   })
 })
 

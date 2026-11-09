@@ -69,7 +69,7 @@ export interface Avviso { tipo: TipoAvviso; messaggio: string; conAppuntamentoId
 export interface RigaPromemoria {
   appuntamento: Appuntamento; cliente: Cliente; operatore: Operatore; servizio?: Servizio;
   testo: string;                // testo finale (ritoccato o standard, segnaposto già sostituiti)
-  link: string;                 // https://wa.me/...?text=...
+  link: string;                 // https://api.whatsapp.com/send/?phone=...&text=...
   inAttesa: boolean;            // promemoria inviato e stato non ancora confermato/disdetto
 }
 

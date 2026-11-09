@@ -232,7 +232,7 @@ export function componiPromemoria(modello: string, valori: Record<string, string
 }
 
 export function linkWhatsApp(telefono: string, testo: string): string {
-  return `https://wa.me/${telefono}?text=${encodeURIComponent(testo)}`
+  return `https://api.whatsapp.com/send/?phone=${telefono}&text=${encodeURIComponent(testo)}`
 }
 
 export function oggi(): ISODate {

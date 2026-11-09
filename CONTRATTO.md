@@ -113,7 +113,7 @@ export interface Avviso { tipo: TipoAvviso; messaggio: string; conAppuntamentoId
 export interface RigaPromemoria {
   appuntamento: Appuntamento; cliente: Cliente; operatore: Operatore; servizio?: Servizio;
   testo: string;                // testo finale (ritoccato o standard, segnaposto già sostituiti)
-  link: string;                 // https://wa.me/...?text=...
+  link: string;                 // https://api.whatsapp.com/send/?phone=...&text=...
   inAttesa: boolean;            // promemoria inviato e stato non ancora confermato/disdetto
 }
 
@@ -162,7 +162,9 @@ fraseDelMomento(momento: MomentoFrase, contesto: ContestoFrase, imp: Impostazion
   aggiornamento della schermata), giorni diversi → di solito frasi diverse (indice = hash di
   `data + momento` modulo il numero di frasi). Segnaposto: `{teste}` `{restanti}` `{prossimo}`
   `{operatore}` (un operatore attivo scelto con lo stesso hash), sostituiti con `componiPromemoria`.
-- `linkWhatsApp`: `https://wa.me/<telefono>?text=<encodeURIComponent(testo)>`. Il testo decodificato
+- `linkWhatsApp`: `https://api.whatsapp.com/send/?phone=<telefono>&text=<encodeURIComponent(testo)>`.
+  **Non `wa.me`**: il suo rimando sostituisce le emoji di 4 byte con `�` (verificato il 9/11/2026:
+  `%F0%9F%98%89` arriva come `%EF%BF%BD`). Il testo decodificato
   dal link deve essere **identico byte per byte** all'originale.
 
 ### Clienti

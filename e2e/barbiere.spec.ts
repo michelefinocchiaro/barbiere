@@ -119,7 +119,7 @@ test.describe('flusso tablet agenda', () => {
   test.describe.configure({ timeout: 45_000 })
 
   test.beforeEach(async ({ page, context }) => {
-    await context.route('https://wa.me/**', (route) => route.abort())
+    await context.route('https://api.whatsapp.com/**', (route) => route.abort())
     await page.clock.setFixedTime(SABATO)
     await page.goto('/')
     await esciBenvenutoVuoto(page)
@@ -159,8 +159,8 @@ test.describe('flusso tablet agenda', () => {
     const invia = page.locator('a.btn-invia').first()
     await expect(invia).toBeVisible()
     const link = await invia.getAttribute('href')
-    expect(link).toMatch(/^https:\/\/wa\.me\/393330000001\?text=/)
-    const testo = decodeURIComponent(link!.split('?text=')[1] ?? '')
+    expect(link).toMatch(/^https:\/\/api\.whatsapp\.com\/send\/\?phone=393330000001&text=/)
+    const testo = new URL(link!).searchParams.get('text')!
     expect(testo).toBe(TESTO_PROMEMORIA_ATTESO)
     await invia.click()
     await expect(page.getByRole('button', { name: 'Ha confermato' }).first()).toBeVisible({
@@ -168,7 +168,7 @@ test.describe('flusso tablet agenda', () => {
     })
   })
 
-  test('Invia produce una sola richiesta wa.me e resta su Promemoria', async ({ page, context }) => {
+  test('Invia produce una sola richiesta WhatsApp e resta su Promemoria', async ({ page, context }) => {
     await impostaDataAgenda(page, '2026-11-17')
     await page.getByRole('button', { name: /Nuovo appuntamento 08:15/i }).first().click()
     await page.getByPlaceholder('Nome o ultime cifre del telefono').fill('Cliente Prova')
@@ -183,8 +183,8 @@ test.describe('flusso tablet agenda', () => {
     await page.locator('.prom-data input[type="date"]').fill('2026-11-17')
 
     let richiesteWa = 0
-    await context.unroute('https://wa.me/**')
-    await context.route('https://wa.me/**', (route) => {
+    await context.unroute('https://api.whatsapp.com/**')
+    await context.route('https://api.whatsapp.com/**', (route) => {
       richiesteWa += 1
       route.abort()
     })
