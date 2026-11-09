@@ -47,6 +47,19 @@ export interface Impostazioni {
   servizi: Servizio[];
   testoPromemoria: string;      // con segnaposto {quando} {ora} {nome} {operatore} {servizio}
   ultimoBackupIl?: string;
+  frasi?: Partial<Record<MomentoFrase, string[]>>;  // battute dell'app per chi sta al bancone; mancano = predefinite
+  demoAttiva?: boolean;         // true dopo caricaDatiDemo, false dopo svuotaTutto/importaBackup
+}
+
+/** Le battute che l'app mostra a chi sta al bancone. Mai nei messaggi ai clienti. */
+export type MomentoFrase =
+  | "mattina" | "pomeriggio" | "sera" | "fine_giornata"
+  | "giornata_vuota" | "chiuso" | "promemoria_finiti" | "caricamento";
+export interface ContestoFrase {
+  data: ISODate;
+  teste?: number;               // appuntamenti non disdetti del giorno
+  restanti?: number;            // di questi, quelli non ancora iniziati
+  prossimo?: string;            // es. "martedì", già calcolato con quando()
 }
 
 export type TipoAvviso = "sovrapposizione" | "fuori_orario" | "giorno_chiuso" | "assenza";

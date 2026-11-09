@@ -9,6 +9,7 @@ import {
   riepilogo,
 } from '../../core'
 import { BackupBanner } from '../components/BackupBanner'
+import { DemoFascia } from '../components/DemoFascia'
 import { Sidebar, type VoceNav } from './Sidebar'
 import './Layout.css'
 
@@ -30,15 +31,23 @@ export function Layout({ voce, onNaviga, children }: Props) {
     return r.daInviare
   }, [imp, oggiIso])
 
+  const logoUrl = imp?.logo ? `${import.meta.env.BASE_URL}${imp.logo}` : ''
+
   return (
     <div className="app-shell">
+      {logoUrl ? (
+        <header className="app-topbar">
+          <img className="app-topbar-logo" src={logoUrl} alt="" width={120} height={36} />
+        </header>
+      ) : null}
       <Sidebar
         attiva={voce}
         onNaviga={onNaviga}
         badgePromemoria={badge}
-        logo={imp?.logo ? `${import.meta.env.BASE_URL}${imp.logo}` : ''}
+        logo={logoUrl}
       />
       <main className="app-main">
+        {imp?.demoAttiva ? <DemoFascia /> : null}
         <BackupBanner />
         {children}
       </main>

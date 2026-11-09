@@ -16,6 +16,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      includeAssets: ['fonts/*.woff2'],
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webmanifest}'],
+      },
       manifest: {
         name: impostazioni.nomeNegozio,
         short_name: impostazioni.nomeNegozio,

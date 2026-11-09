@@ -15,16 +15,19 @@ import type {
   RigaPromemoria,
   StatoAppuntamento,
 } from './tipi.ts'
+import { FRASI_PREDEFINITE, fraseDelMomento, momentoDellaGiornata } from './frasi.ts'
 
 export type {
   Appuntamento,
   Avviso,
   Blocco,
   Cliente,
+  ContestoFrase,
   EsitoPromemoria,
   HHMM,
   Impostazioni,
   ISODate,
+  MomentoFrase,
   Operatore,
   Riepilogo,
   RigaPromemoria,
@@ -32,6 +35,8 @@ export type {
   StatoAppuntamento,
   TipoAvviso,
 } from './tipi.ts'
+
+export { FRASI_PREDEFINITE, fraseDelMomento, momentoDellaGiornata }
 
 // Database
 export const db = new Dexie('barbiere') as Dexie & {
@@ -455,7 +460,13 @@ export async function impostaTestoPromemoria(id: string, testo: string | null): 
 // Impostazioni, backup, demo
 export async function leggiImpostazioni(): Promise<Impostazioni> {
   const row = await db.impostazioni.get('impostazioni')
-  if (row) return row.valore
+  if (row) {
+    const valore = row.valore
+    if (valore.frasi === undefined && impostazioniDefault.frasi !== undefined) {
+      return { ...valore, frasi: impostazioniDefault.frasi }
+    }
+    return valore
+  }
   return { ...impostazioniDefault }
 }
 
@@ -497,7 +508,10 @@ export async function importaBackup(file: Blob): Promise<{ clienti: number; appu
     await db.appuntamenti.bulkAdd(payload.appuntamenti ?? [])
     await db.blocchi.bulkAdd(payload.blocchi ?? [])
     if (payload.impostazioni) {
-      await db.impostazioni.add({ id: 'impostazioni', valore: payload.impostazioni })
+      await db.impostazioni.add({
+        id: 'impostazioni',
+        valore: { ...payload.impostazioni, demoAttiva: false },
+      })
     }
   })
   return {
@@ -518,6 +532,7 @@ export async function giorniDallUltimoBackup(): Promise<number | null> {
 export async function caricaDatiDemo(): Promise<void> {
   await svuotaTutto()
   const imp = await leggiImpostazioni()
+  await salvaImpostazioni({ ...imp, demoAttiva: true })
   const operatoriAttivi = [...imp.operatori]
     .filter((o) => o.attivo)
     .sort((a, b) => a.ordine - b.ordine)

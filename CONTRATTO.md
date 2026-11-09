@@ -91,6 +91,19 @@ export interface Impostazioni {
   servizi: Servizio[];
   testoPromemoria: string;      // con segnaposto {quando} {ora} {nome} {operatore} {servizio}
   ultimoBackupIl?: string;
+  frasi?: Partial<Record<MomentoFrase, string[]>>;  // battute dell'app per chi sta al bancone; mancano = predefinite
+  demoAttiva?: boolean;         // true dopo caricaDatiDemo, false dopo svuotaTutto/importaBackup
+}
+
+/** Le battute che l'app mostra a chi sta al bancone. Mai nei messaggi ai clienti. */
+export type MomentoFrase =
+  | "mattina" | "pomeriggio" | "sera" | "fine_giornata"
+  | "giornata_vuota" | "chiuso" | "promemoria_finiti" | "caricamento";
+export interface ContestoFrase {
+  data: ISODate;
+  teste?: number;               // appuntamenti non disdetti del giorno
+  restanti?: number;            // di questi, quelli non ancora iniziati
+  prossimo?: string;            // es. "martedì", già calcolato con quando()
 }
 
 export type TipoAvviso = "sovrapposizione" | "fuori_orario" | "giorno_chiuso" | "assenza";
@@ -125,6 +138,9 @@ prossimoGiornoApertura(da: ISODate, imp: Impostazioni, blocchi: Blocco[]): ISODa
 componiPromemoria(modello: string, valori: Record<string, string>): string
 linkWhatsApp(telefono: string, testo: string): string
 oggi(): ISODate                                            // data corrente a Europe/Rome
+momentoDellaGiornata(data: ISODate, ora: HHMM, imp: Impostazioni, blocchi: Blocco[],
+                     teste: number, restanti: number): MomentoFrase
+fraseDelMomento(momento: MomentoFrase, contesto: ContestoFrase, imp: Impostazioni): string
 ```
 
 **Regole che i test devono fissare:**
@@ -137,6 +153,15 @@ oggi(): ISODate                                            // data corrente a Eu
   blocco di tutto il negozio per la giornata intera. Sabato 14/11/2026 → martedì 17/11/2026.
 - `componiPromemoria`: sostituisce i segnaposto noti e **lascia intatti quelli sconosciuti**.
   Non tocca nient'altro: emoji, `’`, a capo, maiuscole restano identici.
+- `momentoDellaGiornata`: giorno chiuso (fuori da `giorniApertura` o blocco di tutto il negozio per
+  la giornata intera) → `"chiuso"`; `teste === 0` → `"giornata_vuota"`; ora ≥ `chiude` oppure
+  `restanti === 0` → `"fine_giornata"`; prima delle 12:00 → `"mattina"`; prima delle 17:00 →
+  `"pomeriggio"`; altrimenti `"sera"`.
+- `fraseDelMomento`: prende `imp.frasi[momento]` se non vuoto, altrimenti `FRASI_PREDEFINITE[momento]`.
+  La scelta è **deterministica**: stesso giorno e stesso momento → stessa frase (non cambia a ogni
+  aggiornamento della schermata), giorni diversi → di solito frasi diverse (indice = hash di
+  `data + momento` modulo il numero di frasi). Segnaposto: `{teste}` `{restanti}` `{prossimo}`
+  `{operatore}` (un operatore attivo scelto con lo stesso hash), sostituiti con `componiPromemoria`.
 - `linkWhatsApp`: `https://wa.me/<telefono>?text=<encodeURIComponent(testo)>`. Il testo decodificato
   dal link deve essere **identico byte per byte** all'originale.
 
@@ -183,9 +208,11 @@ salvaImpostazioni(imp: Impostazioni): Promise<void>
 esportaBackup(): Promise<Blob>                        // JSON { versione: 1, esportatoIl, ...tabelle }; aggiorna ultimoBackupIl
 importaBackup(file: Blob): Promise<{ clienti: number; appuntamenti: number }>  // sostituisce tutto; rifiuta versioni sconosciute
 giorniDallUltimoBackup(): Promise<number | null>
-caricaDatiDemo(): Promise<void>                       // SOLO dati inventati, vedi sotto
-svuotaTutto(): Promise<void>
+caricaDatiDemo(): Promise<void>                       // SOLO dati inventati, vedi sotto; imposta demoAttiva = true
+svuotaTutto(): Promise<void>                          // demoAttiva = false
 ```
+`leggiImpostazioni`: se le impostazioni salvate non hanno `frasi`, le prende da `src/negozi/<negozio>.ts`
+(così chi aveva già l'app riceve le battute nuove). `FRASI_PREDEFINITE` è esportato da `index.ts`.
 
 ## Un negozio: `src/negozi/<negozio>.ts`
 

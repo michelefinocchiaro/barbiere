@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import type { EsitoPromemoria, ISODate, RigaPromemoria, Riepilogo, StatoAppuntamento } from '../../core'
 import {
   blocchiDelGiorno,
   formattaOra,
+  fraseDelMomento,
   impostaEsitoPromemoria,
   impostaStato,
   impostaTestoPromemoria,
@@ -14,6 +15,8 @@ import {
   righePromemoria,
 } from '../../core'
 import type { ToastAzione } from '../components/Toast'
+import { Caricamento } from '../components/Caricamento'
+import { PaloBarbiere } from '../components/PaloBarbiere'
 import { formattaDataBreve, inputDateVal } from '../utils/dateUi'
 import './Promemoria.css'
 
@@ -37,14 +40,21 @@ export function Promemoria({ onToast }: Props) {
   const righe = useLiveQuery(() => (data ? righePromemoria(data) : Promise.resolve([])), [data])
   const riep = useLiveQuery(() => (data ? riepilogo(data) : Promise.resolve(null)), [data])
 
+  const festa = useMemo(() => {
+    if (!riep || !imp || !data) return null
+    if (riep.totale === 0) return null
+    if (riep.daInviare > 0 || riep.inAttesa > 0) return null
+    return fraseDelMomento('promemoria_finiti', { data }, imp)
+  }, [riep, imp, data])
+
   if (!imp || !data) {
-    return <div className="prom-caricamento">Caricamento…</div>
+    return <Caricamento className="prom-caricamento" />
   }
 
   return (
     <div className="promemoria">
       <header className="prom-intestazione">
-        <h1>
+        <h1 className="font-titolo">
           Promemoria per <strong>{formattaDataBreve(data)}</strong>
         </h1>
         <label className="prom-data">
@@ -59,11 +69,18 @@ export function Promemoria({ onToast }: Props) {
 
       {riep ? <RiepilogoBar riepilogo={riep} /> : null}
 
-      <ul className="prom-lista">
-        {(righe ?? []).map((r) => (
-          <RigaRow key={r.appuntamento.id} riga={r} onToast={onToast} />
-        ))}
-      </ul>
+      {festa ? (
+        <div className="prom-festa">
+          <PaloBarbiere variant="festa" />
+          <p className="prom-festa-frase font-titolo">{festa}</p>
+        </div>
+      ) : (
+        <ul className="prom-lista">
+          {(righe ?? []).map((r) => (
+            <RigaRow key={r.appuntamento.id} riga={r} onToast={onToast} />
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

@@ -389,15 +389,6 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
           onSalvaComunque={() => void salva(true)}
         />
 
-        <button
-          type="button"
-          className="btn-primario btn-salva"
-          disabled={!clienteSel || inSalvataggio}
-          onClick={() => void salva(false)}
-        >
-          Salva
-        </button>
-
         {modifica && clienteSel ? (
           <div className="telefono-grande">
             <a href={`tel:+${clienteSel.telefono}`}>{telefonoMostra}</a>
@@ -471,6 +462,17 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
           <StoricoCliente clienteId={clienteSel.id} formattaOra={formattaOra} />
         ) : null}
       </div>
+
+      <footer className="pannello-piede">
+        <button
+          type="button"
+          className="btn-primario btn-salva"
+          disabled={!clienteSel || inSalvataggio}
+          onClick={() => void salva(false)}
+        >
+          Salva
+        </button>
+      </footer>
     </aside>
   )
 }

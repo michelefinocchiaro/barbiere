@@ -1,4 +1,7 @@
+@import './fonts.css';
 @import './variables.css';
+@import './design.css';
+@import './responsive.css';
 
 *,
 *::before,

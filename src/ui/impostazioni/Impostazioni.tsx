@@ -11,11 +11,13 @@ import {
   importaBackup,
   leggiImpostazioni,
   oggi,
+  prossimoGiornoApertura,
   quando,
   salvaBlocco,
   salvaImpostazioni,
   svuotaTutto,
 } from '../../core'
+import { Caricamento } from '../components/Caricamento'
 import { inputDateVal } from '../utils/dateUi'
 import './Impostazioni.css'
 
@@ -43,15 +45,21 @@ export function ImpostazioniSchermata() {
     if (impDb) setImp(structuredClone(impDb))
   }, [impDb])
 
+  const blocchiOggi = useLiveQuery(() => blocchiDelGiorno(oggi()), [])
+
   if (!imp) {
-    return <div className="imp-caricamento">Caricamento…</div>
+    return <Caricamento className="imp-caricamento" />
   }
 
   const primoOperatore = [...imp.operatori]
     .filter((o) => o.attivo)
     .sort((a, b) => a.ordine - b.ordine)[0]
+  const dataAnteprima =
+    blocchiOggi !== undefined
+      ? prossimoGiornoApertura(oggi(), imp, blocchiOggi ?? [])
+      : prossimoGiornoApertura(oggi(), imp, [])
   const anteprima = componiPromemoria(imp.testoPromemoria, {
-    quando: quando('2026-11-17', oggi()),
+    quando: quando(dataAnteprima, oggi()),
     ora: formattaOra('08:15'),
     nome: 'Cliente Esempio',
     operatore: primoOperatore?.nome ?? '',

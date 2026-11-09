@@ -1,0 +1,66 @@
+.benvenuto {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem 1.5rem;
+  background: var(--tc-nero);
+  color: var(--tc-crema);
+  text-align: center;
+}
+
+.benvenuto-logo {
+  max-width: min(220px, 70vw);
+  height: auto;
+  object-fit: contain;
+}
+
+.benvenuto-nome {
+  margin: 0;
+  font-size: var(--tc-fs-xl);
+  color: var(--tc-crema);
+}
+
+.benvenuto-testo {
+  margin: 0;
+  max-width: 22rem;
+  font-size: var(--tc-fs-md);
+  color: var(--tc-argento);
+  line-height: 1.45;
+}
+
+.benvenuto-azioni {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 20rem;
+  margin-top: 0.5rem;
+}
+
+.btn-primario {
+  background: var(--tc-rosso);
+  color: var(--tc-crema);
+  font-weight: 600;
+  padding: 0.65rem 1.25rem;
+  border-radius: 6px;
+  min-height: var(--tc-tocco-min);
+  min-width: auto;
+  width: 100%;
+}
+
+.btn-secondario {
+  background: transparent;
+  color: var(--tc-crema);
+  border: 1px solid var(--tc-argento-scuro);
+  padding: 0.65rem 1.25rem;
+  border-radius: 6px;
+  min-height: var(--tc-tocco-min);
+  min-width: auto;
+  width: 100%;
+}

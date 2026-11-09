@@ -10,3 +10,7 @@
 .backup-banner-hint {
   color: var(--tc-blu);
 }
+
+.backup-banner-breve {
+  display: none;
+}

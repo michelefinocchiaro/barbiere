@@ -42,7 +42,7 @@ export function Clienti() {
         />
       </header>
 
-      <div className="clienti-corpo">
+      <div className={`clienti-corpo${selezionato ? ' clienti-vista-scheda' : ''}`}>
         <ul className="clienti-lista">
           {lista.map((c) => (
             <li key={c.id}>
@@ -59,11 +59,16 @@ export function Clienti() {
         </ul>
 
         {selezionato ? (
-          <SchedaCliente
-            cliente={selezionato}
-            prefisso={imp?.prefissoPredefinito ?? '39'}
-            onSalvato={setSelezionato}
-          />
+          <div className="clienti-scheda-wrap">
+            <button type="button" className="clienti-indietro" onClick={() => setSelezionato(null)}>
+              ← Clienti
+            </button>
+            <SchedaCliente
+              cliente={selezionato}
+              prefisso={imp?.prefissoPredefinito ?? '39'}
+              onSalvato={setSelezionato}
+            />
+          </div>
         ) : (
           <p className="clienti-scegli">Seleziona un cliente</p>
         )}

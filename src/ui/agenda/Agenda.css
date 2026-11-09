@@ -7,16 +7,63 @@
   position: relative;
 }
 
-.agenda-chiuso .agenda-griglia-wrap {
-  opacity: 0.45;
+.agenda-vista-chiuso .agenda-intestazione {
+  border-bottom-color: var(--tc-argento-scuro);
 }
 
-.agenda-chiuso-msg {
+.agenda-vista-centro {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.5rem 1rem;
   text-align: center;
-  color: var(--tc-argento);
-  margin: 0.5rem 0;
-  font-size: 1.25rem;
+}
+
+.agenda-stato-label {
+  margin: 0;
+  font-size: var(--tc-fs-md);
   font-weight: 600;
+  color: var(--tc-argento);
+}
+
+.agenda-frase-momento {
+  margin: 0;
+  font-size: var(--tc-fs-md);
+  color: var(--tc-crema);
+  max-width: 22rem;
+  line-height: 1.35;
+}
+
+.agenda-link-discreto {
+  font-size: var(--tc-fs-sm);
+  color: var(--tc-argento);
+  text-decoration: underline;
+  min-height: var(--tc-tocco-min);
+  padding: 0.35rem 0.75rem;
+}
+
+.agenda-vuota-overlay {
+  position: absolute;
+  left: 3.5rem;
+  right: 0;
+  top: var(--agenda-testata-h);
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  pointer-events: none;
+  z-index: 4;
+  text-align: center;
+  padding: 0.5rem;
+}
+
+.agenda-btn-nuovo {
+  pointer-events: auto;
 }
 
 .agenda-caricamento {
@@ -26,18 +73,62 @@
 
 .agenda-intestazione {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 1rem;
-  padding: 0.75rem 0;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.35rem 0 0.5rem;
   border-bottom: 1px solid var(--tc-argento-scuro);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
+  flex-shrink: 0;
 }
 
-.agenda-nav-data {
+.agenda-riga-principale {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: nowrap;
+}
+
+.agenda-riga-battuta {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
+}
+
+.agenda-battuta {
+  flex: 1;
+  margin: 0;
+  font-size: var(--tc-fs-sm);
+  color: var(--tc-crema);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.agenda-conto-servizi {
+  margin: 0;
+  font-size: var(--tc-fs-xs);
+  color: var(--tc-argento);
+}
+
+.agenda-toggle-compatto {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: var(--tc-fs-xs);
+  color: var(--tc-argento);
+  flex-shrink: 0;
+  min-height: auto;
+}
+
+.agenda-toggle-compatto input {
+  width: 1rem;
+  height: 1rem;
+}
+
+.pannello-backdrop {
+  display: none;
 }
 
 .nav-freccia {
@@ -48,10 +139,16 @@
 
 .agenda-titolo {
   margin: 0;
-  font-size: 1.35rem;
-  font-weight: 600;
-  min-width: 12rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0.35rem;
+  font-size: var(--tc-fs-md);
+  font-weight: 400;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
 }
 
 .btn-oggi {
@@ -63,33 +160,17 @@
   min-width: auto;
 }
 
-.agenda-data-picker input {
-  background: var(--tc-superficie);
-  border: 1px solid var(--tc-argento-scuro);
-  border-radius: 6px;
-  padding: 0.5rem;
-  color: var(--tc-crema);
-  min-height: var(--tc-tocco-min);
-}
-
-.agenda-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--tc-argento);
-  margin-left: auto;
-}
-
-.agenda-toggle input {
-  width: 1.25rem;
-  height: 1.25rem;
+.agenda-data-picker {
+  display: none;
 }
 
 .agenda-griglia-wrap {
   flex: 1;
   display: flex;
+  align-items: flex-start;
   min-height: 0;
   overflow: auto;
+  position: relative;
 }
 
 .agenda-ore {
@@ -97,7 +178,7 @@
   width: 3.5rem;
   display: grid;
   grid-template-rows: repeat(var(--slot-count), var(--tc-slot-h));
-  padding-top: 2.5rem;
+  padding-top: var(--agenda-testata-h);
 }
 
 .agenda-ora-label {
@@ -119,15 +200,25 @@
 .agenda-colonna {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
 .agenda-operatore-nome {
   margin: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  min-height: var(--agenda-testata-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   font-size: 1.1rem;
-  padding: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   background: var(--tc-superficie);
   border-radius: 8px 8px 0 0;
 }
@@ -201,7 +292,13 @@
 }
 
 .app-blocco.stato-confermato {
-  border-left: 4px solid #5cb85c;
+  border-left: 4px solid var(--tc-verde-salvia);
+  background: rgba(107, 143, 113, 0.25);
+}
+
+.app-blocco.in-attesa {
+  border-left: 4px solid var(--tc-ambra);
+  background: rgba(196, 146, 58, 0.2);
 }
 
 .app-blocco.stato-disdetto {
@@ -225,15 +322,26 @@
 
 .app-blocco-servizio {
   font-size: 0.8rem;
-  color: var(--tc-argento);
+  color: var(--tc-crema);
+  opacity: 0.85;
 }
 
 .app-blocco-spunta {
   position: absolute;
   top: 4px;
   right: 6px;
-  color: #5cb85c;
+  color: var(--tc-verde-salvia);
   font-weight: bold;
+}
+
+.btn-primario {
+  background: var(--tc-rosso);
+  color: var(--tc-crema);
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  min-height: var(--tc-tocco-min);
+  min-width: auto;
 }
 
 .app-blocco-breve {
@@ -256,4 +364,10 @@
 
 .app-blocco-breve.stato-confermato .app-blocco-riga {
   padding-right: 0.85rem;
+}
+
+/* Sul tablet e sul PC i pulsanti al centro non si allungano su tutta la colonna */
+.agenda-vuota-overlay .btn-primario,
+.agenda-vista-centro .btn-primario {
+  width: min(100%, 22rem);
 }

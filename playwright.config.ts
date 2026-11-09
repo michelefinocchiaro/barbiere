@@ -16,6 +16,15 @@ export default defineConfig({
   },
   projects: [
     {
+      name: 'telefono-390',
+      use: {
+        ...devices['Pixel 5'],
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
+    {
       name: 'tablet-1280',
       use: {
         ...devices['Desktop Chrome'],

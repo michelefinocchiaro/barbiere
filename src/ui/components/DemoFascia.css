@@ -1,0 +1,45 @@
+.demo-fascia {
+  flex-shrink: 0;
+  padding: 0.35rem 0.75rem;
+  background: rgba(200, 50, 58, 0.15);
+  border-bottom: 1px solid var(--tc-argento-scuro);
+  font-size: var(--tc-fs-sm);
+  color: var(--tc-argento);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.demo-fascia > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.demo-fascia-azione {
+  color: var(--tc-crema);
+  font-weight: 600;
+  text-decoration: underline;
+  min-height: var(--tc-tocco-min);
+  min-width: var(--tc-tocco-min);
+  padding: 0.35rem 0.75rem;
+}
+
+.demo-fascia-conferma {
+  white-space: normal;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.demo-fascia-conferma button {
+  min-height: var(--tc-tocco-min);
+  min-width: 2.75rem;
+  padding: 0.35rem 0.75rem;
+  background: var(--tc-superficie);
+  border-radius: 4px;
+  font-size: var(--tc-fs-sm);
+}

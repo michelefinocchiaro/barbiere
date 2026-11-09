@@ -23,6 +23,7 @@ import {
   trovaOCreaCliente,
   verificaAppuntamento,
 } from './index.ts'
+import { impostazioni as impostazioniNegozio } from '../negozi/index.ts'
 import type { Appuntamento, Blocco, Cliente, Impostazioni } from './tipi.ts'
 
 const op1 = 'op1'
@@ -301,15 +302,59 @@ describe('backup', () => {
     expect(appuntamentiDopo).toEqual(appuntamentiPrima)
     expect(blocchiDopo).toEqual(blocchiPrima)
 
-    const { ultimoBackupIl: _dopo, ...impSenzaBackup } = impDopo
-    const { ultimoBackupIl: _prima, ...impAttesa } = impConTutto
+    const {
+      ultimoBackupIl: _dopo,
+      frasi: _frasiDopo,
+      demoAttiva: _demoDopo,
+      ...impSenzaBackup
+    } = impDopo
+    const {
+      ultimoBackupIl: _prima,
+      frasi: _frasiPrima,
+      demoAttiva: _demoPrima,
+      ...impAttesa
+    } = impConTutto
     expect(impSenzaBackup).toEqual(impAttesa)
     expect(impDopo.ultimoBackupIl).toBeDefined()
+    expect(impDopo.demoAttiva).toBe(false)
   })
 
   it('rifiuta versioni sconosciute', async () => {
     const blob = new Blob([JSON.stringify({ versione: 99, clienti: [], appuntamenti: [], blocchi: [] })])
     await expect(importaBackup(blob)).rejects.toThrow('Versione backup non supportata')
+  })
+})
+
+describe('demoAttiva', () => {
+  it('true dopo caricaDatiDemo, false dopo svuotaTutto e importaBackup', async () => {
+    await caricaDatiDemo()
+    expect((await leggiImpostazioni()).demoAttiva).toBe(true)
+
+    await svuotaTutto()
+    const dopoSvuota = await leggiImpostazioni()
+    expect(dopoSvuota.demoAttiva).toBeFalsy()
+
+    await salvaImpostazioni({ ...impDemo, demoAttiva: true })
+    const blob = await esportaBackup()
+    await svuotaTutto()
+    await importaBackup(blob)
+    expect((await leggiImpostazioni()).demoAttiva).toBe(false)
+  })
+})
+
+describe('leggiImpostazioni frasi', () => {
+  it('riempie frasi dal negozio se mancano nelle impostazioni salvate', async () => {
+    const senzaFrasi: Impostazioni = {
+      ...impDemo,
+      nomeNegozio: 'Salvato',
+    }
+    delete senzaFrasi.frasi
+    await salvaImpostazioni(senzaFrasi)
+
+    const imp = await leggiImpostazioni()
+    expect(imp.nomeNegozio).toBe('Salvato')
+    expect(imp.frasi).toEqual(impostazioniNegozio.frasi)
+    expect(imp.frasi?.mattina?.[0]).toContain('friend')
   })
 })
 

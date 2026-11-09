@@ -124,8 +124,13 @@
   margin: 0;
 }
 
-@media (max-width: 800px) {
-  .clienti-corpo {
-    grid-template-columns: 1fr;
-  }
+.clienti-indietro {
+  display: none;
+}
+
+.clienti-scheda-wrap {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }

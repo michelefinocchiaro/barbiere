@@ -13,5 +13,8 @@
   --tc-tocco-min: 48px;
   --tc-sidebar-w: 200px;
   --tc-slot-h: 48px;
-  --tc-font: system-ui, 'Segoe UI', sans-serif;
+  --agenda-testata-h: 2.5rem;
+  --tc-font: 'Barlow Semi Condensed', 'Arial Narrow', system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+
+  color-scheme: dark;
 }

@@ -95,3 +95,16 @@ export function slotOrari(apre: HHMM, chiude: HHMM, passoMin: number): HHMM[] {
 export function inputDateVal(iso: ISODate): string {
   return iso
 }
+
+/** Ora corrente a Europe/Rome (solo UI). */
+export function oraAdesso(): HHMM {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Rome',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date())
+  const h = parts.find((p) => p.type === 'hour')?.value ?? '00'
+  const m = parts.find((p) => p.type === 'minute')?.value ?? '00'
+  return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`
+}

@@ -1,4 +1,5 @@
 import type { Impostazioni } from '../core/tipi.ts'
+import { FRASI_PREDEFINITE } from '../core/frasi.ts'
 
 export const impostazioni: Impostazioni = {
   nomeNegozio: 'Toma Capelli',
@@ -21,4 +22,22 @@ export const impostazioni: Impostazioni = {
   testoPromemoria: `Ciao friend ti ricordiamo l’appuntamento di {quando}
 RESTIAMO IN ATTESA DI CONFERMA !! 😉💈💇🏻‍♂️👋🏻
 Ci vediamo alle {ora}`,
+  frasi: {
+    mattina: [
+      'Buongiorno friend! Oggi {teste} teste da sistemare 💈',
+      ...FRASI_PREDEFINITE.mattina,
+    ],
+    fine_giornata: [
+      '{teste} teste sistemate oggi. Grande squadra, friend! 💈',
+      ...FRASI_PREDEFINITE.fine_giornata,
+    ],
+    promemoria_finiti: [
+      'Tutti avvisati, friend! 👋🏻',
+      ...FRASI_PREDEFINITE.promemoria_finiti,
+    ],
+    giornata_vuota: [
+      'Agenda libera… {operatore}, è l\'ora del caffè ☕',
+      ...FRASI_PREDEFINITE.giornata_vuota,
+    ],
+  },
 }

@@ -10,6 +10,7 @@
   display: flex;
   flex-direction: column;
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
+  min-height: 0;
 }
 
 .pannello-intestazione {
@@ -26,7 +27,6 @@
 }
 
 .pannello-chiudi {
-  min-width: auto;
   font-size: 1.25rem;
   color: var(--tc-argento);
 }

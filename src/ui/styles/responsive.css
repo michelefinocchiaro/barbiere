@@ -1,0 +1,456 @@
+/* Telefono ≤700 px — navigazione in basso, layout compatto */
+
+:root {
+  --tc-bottom-nav-h: 4.25rem;
+  --tc-content-max: 1100px;
+  --tc-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.app-topbar {
+  display: none;
+}
+
+.sidebar-icona {
+  display: none;
+}
+
+.sidebar-etichetta {
+  flex: 1;
+}
+
+@media (max-width: 700px) {
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .app-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0.35rem 0.75rem;
+    background: var(--tc-superficie);
+    border-bottom: 1px solid var(--tc-argento-scuro);
+  }
+
+  .app-topbar-logo {
+    max-height: 2rem;
+    width: auto;
+    object-fit: contain;
+  }
+
+  .sidebar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: 100%;
+    flex-direction: row;
+    align-items: stretch;
+    padding: 0.35rem 0.25rem calc(0.35rem + var(--tc-safe-bottom));
+    gap: 0;
+    border-right: none;
+    border-top: 1px solid var(--tc-argento-scuro);
+    z-index: 90;
+    height: calc(var(--tc-bottom-nav-h) + var(--tc-safe-bottom));
+  }
+
+  .sidebar-logo {
+    display: none;
+  }
+
+  .sidebar-voci {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    gap: 0.15rem;
+  }
+
+  .sidebar-voci li {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sidebar-voce {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0.35rem 0.15rem;
+    gap: 0.15rem;
+    font-size: 0.65rem;
+    line-height: 1.15;
+    min-height: var(--tc-tocco-min);
+  }
+
+  .sidebar-icona {
+    display: block;
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+
+  .sidebar-etichetta {
+    flex: none;
+  }
+
+  .sidebar-badge {
+    position: absolute;
+    top: 0.15rem;
+    right: 0.2rem;
+    min-width: 1.15rem;
+    height: 1.15rem;
+    font-size: 0.7rem;
+  }
+
+  .sidebar-voci li {
+    position: relative;
+  }
+
+  .app-main {
+    padding-bottom: calc(var(--tc-bottom-nav-h) + var(--tc-safe-bottom));
+    min-height: 0;
+  }
+
+  .backup-banner-breve {
+    display: inline;
+  }
+
+  .backup-banner-completo {
+    display: none;
+  }
+
+  /* Agenda */
+  .agenda {
+    padding: 0 0.5rem 0.5rem;
+  }
+
+  .agenda-intestazione {
+    padding: 0.2rem 0 0.3rem;
+    gap: 0.1rem;
+  }
+
+  .agenda-riga-principale {
+    gap: 0.15rem;
+  }
+
+  .agenda-titolo {
+    font-size: var(--tc-fs-sm);
+  }
+
+  .btn-oggi,
+  .nav-freccia {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+    padding: 0.25rem;
+  }
+
+  .btn-oggi {
+    font-size: var(--tc-fs-xs);
+    padding: 0.25rem 0.5rem;
+  }
+
+  .agenda-battuta {
+    font-size: 0.75rem;
+  }
+
+  .sidebar-voce.attiva {
+    background: transparent;
+    color: var(--tc-crema);
+  }
+
+  .sidebar-voce.attiva::after {
+    content: '';
+    position: absolute;
+    top: 0.1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1.75rem;
+    height: 3px;
+    background: var(--tc-palo);
+    background-size: 10px 10px;
+    border-radius: 2px;
+  }
+
+  .agenda-ore {
+    width: 2.25rem;
+  }
+
+  .agenda-ora-label {
+    font-size: 0.6rem;
+  }
+
+  .agenda-colonne {
+    gap: 0.2rem;
+    overflow: hidden;
+  }
+
+  .agenda-operatore-nome {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.1rem;
+  }
+
+  .agenda-griglia-wrap {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .app-blocco {
+    padding: 0.1rem 0.15rem;
+    left: 1px;
+    right: 1px;
+  }
+
+  .app-blocco-cliente,
+  .app-blocco-servizio,
+  .app-blocco-ora {
+    font-size: 0.65rem;
+  }
+
+  .app-blocco-riga {
+    font-size: 0.6rem;
+  }
+
+  /* Pannello fullscreen */
+  .pannello-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    border: none;
+    z-index: 150;
+    min-height: 0;
+    min-width: 0;
+    padding: 0;
+  }
+
+  .pannello-app {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    z-index: 200;
+    border-left: none;
+    box-shadow: none;
+  }
+
+  .pannello-piede {
+    flex-shrink: 0;
+    padding: 0.75rem 1rem calc(0.75rem + var(--tc-safe-bottom));
+    border-top: 1px solid var(--tc-argento-scuro);
+    background: var(--tc-superficie);
+  }
+
+  /* Promemoria */
+  .promemoria {
+    padding: 0 0.5rem 0.5rem;
+  }
+
+  .prom-intestazione {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .prom-intestazione h1 {
+    font-size: 1.05rem;
+    word-break: break-word;
+  }
+
+  .prom-riga {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.65rem;
+  }
+
+  .prom-riga-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .prom-ora {
+    min-width: 0;
+  }
+
+  .prom-riga-azioni {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  .prom-riga-azioni .btn-invia,
+  .prom-riga-azioni .btn-menu,
+  .prom-riga-azioni .btn-conferma,
+  .prom-riga-azioni .btn-disdetto,
+  .prom-riga-azioni .etichetta-chiusa {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .prom-riga-azioni .menu-wrap {
+    width: 100%;
+  }
+
+  .prom-riga-azioni .btn-menu {
+    width: 100%;
+  }
+
+  .prom-testo-riga {
+    width: 100%;
+  }
+
+  /* Impostazioni */
+  .impostazioni {
+    padding: 0 0.5rem calc(5rem + var(--tc-bottom-nav-h) + var(--tc-safe-bottom));
+  }
+
+  .imp-intestazione {
+    position: static;
+  }
+
+  .imp-intestazione .btn-salva-imp {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--tc-bottom-nav-h) + var(--tc-safe-bottom));
+    width: 100%;
+    border-radius: 0;
+    z-index: 80;
+    padding: 0.85rem 1rem;
+    min-height: var(--tc-tocco-min);
+  }
+
+  .imp-riga {
+    flex-direction: column;
+  }
+
+  .imp-giorni {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* Clienti */
+  .clienti {
+    padding: 0 0.5rem 0.5rem;
+  }
+
+  .clienti-intestazione {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .clienti-cerca {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .clienti-corpo.clienti-vista-scheda .clienti-lista,
+  .clienti-corpo.clienti-vista-scheda .clienti-scegli {
+    display: none;
+  }
+
+  .clienti-indietro {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    text-align: left;
+    color: var(--tc-blu);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0;
+  }
+
+  .clienti-corpo {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 701px) {
+  .clienti-indietro {
+    display: none;
+  }
+
+  .backup-banner-breve {
+    display: none;
+  }
+
+  .backup-banner-completo {
+    display: inline;
+  }
+
+  .pannello-backdrop {
+    display: none;
+  }
+
+  .pannello-piede {
+    flex-shrink: 0;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--tc-argento-scuro);
+    background: var(--tc-superficie);
+  }
+}
+
+/* Tablet verticale 701–1023: pannello in overlay */
+@media (min-width: 701px) and (max-width: 1023px) {
+  .pannello-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    border: none;
+    z-index: 150;
+    min-height: 0;
+    min-width: 0;
+    padding: 0;
+  }
+
+  .pannello-app {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(420px, 92vw);
+    z-index: 200;
+  }
+}
+
+/* PC larghi: larghezza leggibile */
+@media (min-width: 1440px) {
+  .promemoria,
+  .clienti,
+  .impostazioni {
+    max-width: var(--tc-content-max);
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+  }
+}
+
+/* Target tocco ≥44 px ovunque */
+.pannello-chiudi {
+  min-width: var(--tc-tocco-min);
+  min-height: var(--tc-tocco-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+}
+
+.btn-modifica-testo {
+  min-height: var(--tc-tocco-min);
+  padding: 0.5rem 0.25rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.imp-segnaposto button {
+  min-height: var(--tc-tocco-min);
+  min-width: var(--tc-tocco-min);
+  padding: 0.5rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

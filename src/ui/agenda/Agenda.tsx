@@ -1,24 +1,31 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import type { Appuntamento, Blocco, Cliente, HHMM, ISODate } from '../../core'
+import type { Appuntamento, Blocco, Cliente, HHMM, ISODate, Impostazioni } from '../../core'
 import {
   appuntamentiDelGiorno,
   blocchiDelGiorno,
   formattaOra,
+  fraseDelMomento,
   leggiImpostazioni,
+  momentoDellaGiornata,
   oggi,
+  prossimoGiornoApertura,
+  quando,
   tuttiIClienti,
 } from '../../core'
 import {
   aggiungiGiorni,
+  formattaDataBreve,
   formattaDataLunga,
-  giornoSettimana,
   inputDateVal,
   minutiDaOra,
+  oraAdesso,
   slotOrari,
 } from '../utils/dateUi'
 import { PannelloAppuntamento } from '../appuntamento/PannelloAppuntamento'
 import type { ToastAzione } from '../components/Toast'
+import { Caricamento } from '../components/Caricamento'
+import { IllustrazioneForbici } from '../components/IllustrazioneForbici'
 import './Agenda.css'
 
 interface SlotTap {
@@ -33,12 +40,45 @@ interface ModificaTap {
 
 interface AgendaProps {
   onToast?: (t: ToastAzione) => void
+  dataIniziale?: ISODate | null
 }
 
-export function Agenda({ onToast }: AgendaProps) {
-  const [data, setData] = useState<ISODate>(() => oggi())
+function useMinuto(): HHMM {
+  const [ora, setOra] = useState(oraAdesso)
+  useEffect(() => {
+    const tick = () => setOra(oraAdesso())
+    const id = setInterval(tick, 60_000)
+    return () => clearInterval(id)
+  }, [])
+  return ora
+}
+
+function conteggioServizi(appuntamenti: Appuntamento[], imp: Impostazioni): string {
+  const m = new Map<string, number>()
+  for (const a of appuntamenti) {
+    if (a.stato === 'disdetto') continue
+    const nome = a.servizioId
+      ? (imp.servizi.find((s) => s.id === a.servizioId)?.nome ?? 'Altro')
+      : 'Senza servizio'
+    m.set(nome, (m.get(nome) ?? 0) + 1)
+  }
+  return [...m.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([nome, n]) => `${n} ${nome}`)
+    .join(' · ')
+}
+
+export function Agenda({ onToast, dataIniziale }: AgendaProps) {
+  const [data, setData] = useState<ISODate>(() => dataIniziale ?? oggi())
   const [nascondiDisdetti, setNascondiDisdetti] = useState(true)
   const [pannello, setPannello] = useState<SlotTap | ModificaTap | null>(null)
+  const dataInputRef = useRef<HTMLInputElement>(null)
+  const grigliaRef = useRef<HTMLDivElement>(null)
+  const oraCorrente = useMinuto()
+
+  useEffect(() => {
+    if (dataIniziale) setData(dataIniziale)
+  }, [dataIniziale])
 
   const imp = useLiveQuery(() => leggiImpostazioni(), [])
   const appuntamenti = useLiveQuery(() => appuntamentiDelGiorno(data), [data])
@@ -56,10 +96,50 @@ export function Agenda({ onToast }: AgendaProps) {
     return m
   }, [clienti])
 
-  const chiuso = useMemo(() => {
-    if (!imp) return false
-    return !imp.giorniApertura.includes(giornoSettimana(data))
-  }, [imp, data])
+  const oggiIso = oggi()
+
+  const nonDisdetti = useMemo(
+    () => (appuntamenti ?? []).filter((a) => a.stato !== 'disdetto'),
+    [appuntamenti],
+  )
+
+  const visibili = useMemo(() => {
+    if (!appuntamenti) return []
+    return nascondiDisdetti ? appuntamenti.filter((a) => a.stato !== 'disdetto') : appuntamenti
+  }, [appuntamenti, nascondiDisdetti])
+
+  const oraMomento: HHMM = data === oggiIso ? oraCorrente : '08:00'
+  const teste = nonDisdetti.length
+  const restanti = useMemo(() => {
+    if (data !== oggiIso) return teste
+    const now = minutiDaOra(oraCorrente)
+    return nonDisdetti.filter((a) => minutiDaOra(a.ora) > now).length
+  }, [data, oggiIso, oraCorrente, nonDisdetti, teste])
+
+  const momento = useMemo(() => {
+    if (!imp) return 'mattina' as const
+    return momentoDellaGiornata(data, oraMomento, imp, blocchi ?? [], teste, restanti)
+  }, [imp, data, oraMomento, blocchi, teste, restanti])
+
+  const chiuso = momento === 'chiuso'
+  const giornataVuota = momento === 'giornata_vuota'
+
+  const contestoFrase = useMemo(() => {
+    if (!imp) return { data, teste, restanti }
+    const pross =
+      data === oggiIso
+        ? quando(prossimoGiornoApertura(oggiIso, imp, blocchi ?? []), data)
+        : quando(prossimoGiornoApertura(data, imp, blocchi ?? []), data)
+    return { data, teste, restanti, prossimo: pross }
+  }, [imp, data, blocchi, teste, restanti, oggiIso])
+
+  const battuta = useMemo(() => {
+    if (!imp) return ''
+    return fraseDelMomento(momento, contestoFrase, imp)
+  }, [imp, momento, contestoFrase])
+
+  const contoServizi =
+    data === oggiIso && momento === 'fine_giornata' && imp ? conteggioServizi(nonDisdetti, imp) : ''
 
   const slots = useMemo(() => {
     if (!imp) return []
@@ -70,62 +150,149 @@ export function Agenda({ onToast }: AgendaProps) {
   const apreMin = imp ? minutiDaOra(imp.apre) : 0
   const passo = imp?.passoGrigliaMin ?? 15
 
-  const visibili = useMemo(() => {
-    if (!appuntamenti) return []
-    return nascondiDisdetti ? appuntamenti.filter((a) => a.stato !== 'disdetto') : appuntamenti
-  }, [appuntamenti, nascondiDisdetti])
+  const lineaOra = useMemo(() => {
+    if (!imp || data !== oggiIso || chiuso) return null
+    const now = minutiDaOra(oraCorrente)
+    const chiude = minutiDaOra(imp.chiude)
+    if (now < apreMin || now >= chiude) return null
+    const riga = (now - apreMin) / passo
+    return {
+      top: `calc(var(--agenda-testata-h) + ${riga} * var(--tc-slot-h))`,
+      label: formattaOra(oraCorrente),
+    }
+  }, [imp, data, oggiIso, chiuso, oraCorrente, apreMin, passo])
 
   const apriNuovo = useCallback((tap: SlotTap) => setPannello(tap), [])
   const apriModifica = useCallback((a: Appuntamento) => setPannello({ appuntamento: a }), [])
   const chiudiPannello = useCallback(() => setPannello(null), [])
 
-  const vaiOggi = () => setData(oggi())
+  const vaiOggi = () => setData(oggiIso)
   const giornoPrima = () => setData((d) => aggiungiGiorni(d, -1))
   const giornoDopo = () => setData((d) => aggiungiGiorni(d, 1))
 
-  if (!imp) {
-    return <div className="agenda-caricamento">Caricamento…</div>
+  const apriPickerData = () => {
+    const el = dataInputRef.current
+    if (el?.showPicker) el.showPicker()
+    else el?.click()
   }
 
-  return (
-    <div className={`agenda${chiuso ? ' agenda-chiuso' : ''}`}>
-      <header className="agenda-intestazione">
-        <div className="agenda-nav-data">
-          <button type="button" className="nav-freccia" onClick={giornoPrima} aria-label="Giorno precedente">
-            ◀
-          </button>
-          <h1 className="agenda-titolo">{formattaDataLunga(data)}</h1>
-          <button type="button" className="nav-freccia" onClick={giornoDopo} aria-label="Giorno successivo">
-            ▶
-          </button>
-        </div>
+  const nuovoPrimoSlot = () => {
+    const op = operatoriAttivi[0]
+    const ora = slots[0]
+    if (op && ora) apriNuovo({ data, ora, operatoreId: op.id })
+  }
+
+  const aggiungiComunque = () => {
+    const op = operatoriAttivi[0]
+    const ora = imp?.apre ?? '08:00'
+    if (op) apriNuovo({ data, ora, operatoreId: op.id })
+  }
+
+  useEffect(() => {
+    if (data !== oggiIso || chiuso || !imp || !grigliaRef.current) return
+    const wrap = grigliaRef.current
+    const now = minutiDaOra(oraCorrente)
+    let targetMin = now
+    if (visibili.length) {
+      const inizi = visibili.map((a) => minutiDaOra(a.ora))
+      const dopo = inizi.filter((m) => m >= now)
+      targetMin = dopo.length ? Math.min(...dopo) : Math.max(...inizi)
+      if (targetMin < now && dopo.length === 0) targetMin = now
+    }
+    const riga = Math.max(0, (targetMin - apreMin) / passo)
+    const testata = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--agenda-testata-h')) || 40
+    const slotH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tc-slot-h')) || 48
+    const top = testata + riga * slotH
+    wrap.scrollTop = Math.max(0, top - wrap.clientHeight / 3)
+  }, [data, oggiIso, chiuso, imp, visibili, apreMin, passo, oraCorrente])
+
+  if (!imp) {
+    return <Caricamento className="agenda-caricamento" />
+  }
+
+  const prossimoAperto = prossimoGiornoApertura(data, imp, blocchi ?? [])
+  const fraseChiuso = fraseDelMomento('chiuso', contestoFrase, imp)
+  const fraseVuota = fraseDelMomento('giornata_vuota', contestoFrase, imp)
+
+  const intestazione = (
+    <header className="agenda-intestazione">
+      <div className="agenda-riga-principale">
+        <button type="button" className="nav-freccia" onClick={giornoPrima} aria-label="Giorno precedente">
+          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
+        <h1 className="agenda-titolo font-titolo" onClick={apriPickerData}>
+          {formattaDataLunga(data)}
+        </h1>
+        <button type="button" className="nav-freccia" onClick={giornoDopo} aria-label="Giorno successivo">
+          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
         <button type="button" className="btn-oggi" onClick={vaiOggi}>
           Oggi
         </button>
-        <label className="agenda-data-picker">
-          <span className="sr-only">Scegli data</span>
-          <input
-            type="date"
-            value={inputDateVal(data)}
-            onChange={(e) => setData(e.target.value as ISODate)}
-          />
-        </label>
-        <label className="agenda-toggle">
+      </div>
+      <label className="agenda-data-picker">
+        <span className="sr-only">Scegli data</span>
+        <input
+          ref={dataInputRef}
+          type="date"
+          value={inputDateVal(data)}
+          onChange={(e) => setData(e.target.value as ISODate)}
+        />
+      </label>
+      <div className="agenda-riga-battuta">
+        <p className="agenda-battuta font-titolo">{chiuso || giornataVuota ? '' : battuta}</p>
+        <label className="agenda-toggle-compatto">
           <input
             type="checkbox"
             checked={nascondiDisdetti}
             onChange={(e) => setNascondiDisdetti(e.target.checked)}
           />
-          Nascondi disdetti
+          <span>Disdetti</span>
         </label>
-      </header>
+      </div>
+      {contoServizi ? <p className="agenda-conto-servizi font-tabular">{contoServizi}</p> : null}
+    </header>
+  )
 
-      {chiuso ? <p className="agenda-chiuso-msg">Chiuso</p> : null}
+  if (chiuso) {
+    return (
+      <div className="agenda agenda-vista-chiuso">
+        {intestazione}
+        <div className="agenda-vista-centro">
+          <IllustrazioneForbici />
+          <p className="agenda-stato-label">Chiuso</p>
+          <p className="agenda-frase-momento font-titolo">{fraseChiuso}</p>
+          <button type="button" className="btn-primario" onClick={() => setData(prossimoAperto)}>
+            Vai a {formattaDataBreve(prossimoAperto)}
+          </button>
+          <button type="button" className="agenda-link-discreto" onClick={aggiungiComunque}>
+            Aggiungi comunque un appuntamento
+          </button>
+        </div>
+        {pannello ? (
+          <>
+            <div className="pannello-backdrop" role="presentation" onClick={chiudiPannello} />
+            <PannelloAppuntamento imp={imp} pannello={pannello} onChiudi={chiudiPannello} onToast={onToast} />
+          </>
+        ) : null}
+      </div>
+    )
+  }
 
-      <div className="agenda-griglia-wrap">
+  return (
+    <div className="agenda">
+      {intestazione}
+
+      <div className="agenda-griglia-wrap" ref={grigliaRef}>
+        {lineaOra ? (
+          <div className="agenda-linea-ora" style={{ top: lineaOra.top }} aria-hidden>
+            <span className="agenda-linea-ora-etichetta font-tabular">{lineaOra.label}</span>
+          </div>
+        ) : null}
+
         <div className="agenda-ore" style={{ '--slot-count': slotCount } as React.CSSProperties}>
           {slots.map((ora) => (
-            <div key={ora} className="agenda-ora-label">
+            <div key={ora} className="agenda-ora-label font-tabular">
               {formattaOra(ora)}
             </div>
           ))}
@@ -150,15 +317,23 @@ export function Agenda({ onToast }: AgendaProps) {
             />
           ))}
         </div>
+
+        {giornataVuota ? (
+          <div className="agenda-vuota-overlay">
+            <IllustrazioneForbici />
+            <p className="agenda-frase-momento font-titolo">{fraseVuota}</p>
+            <button type="button" className="btn-primario agenda-btn-nuovo" onClick={nuovoPrimoSlot}>
+              + Nuovo appuntamento
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {pannello ? (
-        <PannelloAppuntamento
-          imp={imp}
-          pannello={pannello}
-          onChiudi={chiudiPannello}
-          onToast={onToast}
-        />
+        <>
+          <div className="pannello-backdrop" role="presentation" onClick={chiudiPannello} />
+          <PannelloAppuntamento imp={imp} pannello={pannello} onChiudi={chiudiPannello} onToast={onToast} />
+        </>
       ) : null}
     </div>
   )
@@ -221,6 +396,8 @@ function ColonnaOperatore({
           const top = ((minutiDaOra(a.ora) - apreMin) / passo) * pctRiga
           const height = (a.durataMin / passo) * pctRiga
           const stato = a.stato
+          const inAttesa =
+            a.promemoria === 'inviato' && a.stato !== 'confermato' && a.stato !== 'disdetto'
           const breve = a.durataMin <= 20
           const clienteNome = mappaClienti.get(a.clienteId)?.nome ?? '…'
           const servizioNome = nomeServizio(a.servizioId)
@@ -231,7 +408,7 @@ function ColonnaOperatore({
             <button
               key={a.id}
               type="button"
-              className={`app-blocco stato-${stato}${breve ? ' app-blocco-breve' : ''}`}
+              className={`app-blocco stato-${stato}${inAttesa ? ' in-attesa' : ''}${breve ? ' app-blocco-breve' : ''}`}
               style={{
                 top: `${top}%`,
                 height: `${height}%`,
@@ -245,7 +422,7 @@ function ColonnaOperatore({
                 <span className="app-blocco-riga">{rigaBreve}</span>
               ) : (
                 <>
-                  <span className="app-blocco-ora">{formattaOra(a.ora)}</span>
+                  <span className="app-blocco-ora font-tabular">{formattaOra(a.ora)}</span>
                   <span className="app-blocco-cliente">{clienteNome}</span>
                   {servizioNome ? <span className="app-blocco-servizio">{servizioNome}</span> : null}
                 </>
