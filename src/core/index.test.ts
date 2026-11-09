@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   componiPromemoria,
+  formattaEuro,
   formattaOra,
   formattaTelefono,
+  leggiEuro,
   linkWhatsApp,
   normalizzaTelefono,
   oggi,
@@ -53,6 +55,33 @@ describe('formattaOra', () => {
   it('toglie lo zero iniziale all\'ora', () => {
     expect(formattaOra('08:15')).toBe('8.15')
     expect(formattaOra('14:00')).toBe('14.00')
+  })
+})
+
+describe('formattaEuro', () => {
+  it('formatta i centesimi in euro', () => {
+    expect(formattaEuro(1500)).toBe('15,00 €')
+    expect(formattaEuro(50)).toBe('0,50 €')
+    expect(formattaEuro(123456)).toBe('1.234,56 €')
+    expect(formattaEuro(100000)).toBe('1.000,00 €')
+  })
+})
+
+describe('leggiEuro', () => {
+  it('converte stringhe valide in centesimi', () => {
+    expect(leggiEuro('15')).toBe(1500)
+    expect(leggiEuro('15,5')).toBe(1550)
+    expect(leggiEuro('15.50')).toBe(1550)
+    expect(leggiEuro('€ 15,50')).toBe(1550)
+    expect(leggiEuro(' 8,5 € ')).toBe(850)
+  })
+
+  it('rifiuta stringhe non valide', () => {
+    expect(leggiEuro('')).toBeNull()
+    expect(leggiEuro('abc')).toBeNull()
+    expect(leggiEuro('0')).toBeNull()
+    expect(leggiEuro('-5')).toBeNull()
+    expect(leggiEuro('15,555')).toBeNull()
   })
 })
 

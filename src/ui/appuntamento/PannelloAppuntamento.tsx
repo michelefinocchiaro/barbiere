@@ -24,6 +24,10 @@ import {
 } from '../../core'
 import { AvvisiFascia } from '../components/AvvisiFascia'
 import type { ToastAzione } from '../components/Toast'
+import {
+  ModuloSegnaDaPagare,
+  type ModuloSegnaDaPagareHandle,
+} from '../debiti/ModuloSegnaDaPagare'
 import { inputDateVal } from '../utils/dateUi'
 import './PannelloAppuntamento.css'
 
@@ -73,8 +77,10 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
   const [inSalvataggio, setInSalvataggio] = useState(false)
   const [mostraSposta, setMostraSposta] = useState(false)
   const [confermaElimina, setConfermaElimina] = useState(false)
+  const [mostraDebito, setMostraDebito] = useState(false)
 
   const campoRef = useRef<HTMLInputElement>(null)
+  const moduloDebitoRef = useRef<ModuloSegnaDaPagareHandle>(null)
 
   const suggerimenti = useLiveQuery(
     () =>
@@ -249,12 +255,46 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
   return (
     <aside className="pannello-app" role="dialog" aria-labelledby="pannello-titolo">
       <header className="pannello-intestazione">
-        <h2 id="pannello-titolo">{modifica ? 'Modifica appuntamento' : 'Nuovo appuntamento'}</h2>
-        <button type="button" className="pannello-chiudi" onClick={onChiudi} aria-label="Chiudi">
-          ✕
-        </button>
+        {mostraDebito ? (
+          <>
+            <button
+              type="button"
+              className="pannello-indietro"
+              onClick={() => setMostraDebito(false)}
+            >
+              ‹ Appuntamento
+            </button>
+            <h2 id="pannello-titolo">Segna da pagare</h2>
+            <button type="button" className="pannello-chiudi" onClick={onChiudi} aria-label="Chiudi">
+              ✕
+            </button>
+          </>
+        ) : (
+          <>
+            <h2 id="pannello-titolo">{modifica ? 'Modifica appuntamento' : 'Nuovo appuntamento'}</h2>
+            <button type="button" className="pannello-chiudi" onClick={onChiudi} aria-label="Chiudi">
+              ✕
+            </button>
+          </>
+        )}
       </header>
 
+      {mostraDebito && clienteSel ? (
+        <div className="pannello-corpo pannello-corpo-debito">
+          <ModuloSegnaDaPagare
+            ref={moduloDebitoRef}
+            daPannello
+            imp={imp}
+            onChiudi={() => setMostraDebito(false)}
+            onToast={(t) => onToast?.(t)}
+            iniziale={{
+              cliente: clienteSel,
+              data: esistente?.data ?? data,
+              appuntamentoId: esistente?.id,
+            }}
+          />
+        </div>
+      ) : (
       <div className="pannello-corpo">
         <label className="campo">
           Cliente
@@ -403,6 +443,9 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
             <button type="button" className="btn-disdici" onClick={() => void disdici()}>
               Disdici
             </button>
+            <button type="button" onClick={() => setMostraDebito(true)}>
+              Segna da pagare
+            </button>
             {!confermaElimina ? (
               <button type="button" className="btn-pericolo" onClick={() => setConfermaElimina(true)}>
                 Elimina
@@ -462,16 +505,27 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
           <StoricoCliente clienteId={clienteSel.id} formattaOra={formattaOra} />
         ) : null}
       </div>
+      )}
 
       <footer className="pannello-piede">
-        <button
-          type="button"
-          className="btn-primario btn-salva"
-          disabled={!clienteSel || inSalvataggio}
-          onClick={() => void salva(false)}
-        >
-          Salva
-        </button>
+        {mostraDebito ? (
+          <button
+            type="button"
+            className="btn-primario btn-salva"
+            onClick={() => void moduloDebitoRef.current?.salva()}
+          >
+            Salva da pagare
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn-primario btn-salva"
+            disabled={!clienteSel || inSalvataggio}
+            onClick={() => void salva(false)}
+          >
+            Salva
+          </button>
+        )}
       </footer>
     </aside>
   )

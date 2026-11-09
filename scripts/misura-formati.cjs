@@ -69,6 +69,8 @@ function controlla() {
     await p.waitForTimeout(300);
     await passo('promemoria', async () => { await vai('Promemoria'); });
     await passo('clienti', async () => { await vai('Clienti'); await p.getByText('Mario Rossi').first().click({ timeout: 3000 }).catch(()=>{}); await p.waitForTimeout(300); });
+    await passo('da-pagare', async () => { await vai('Da pagare'); });
+    await passo('segna-pagare', async () => { await p.getByRole('button', { name: /Segna da pagare/ }).first().click({ timeout: 3000 }); await p.waitForTimeout(400); });
     for (const [s, prob] of Object.entries(schermate)) { totale += prob.length; righe.push(`${id.padEnd(11)} ${s.padEnd(13)} ${prob.length}${prob.length ? '  ' + prob.slice(0, 4).join(' | ') + (prob.length > 4 ? ` (+${prob.length - 4})` : '') : ''}`); }
     if (errori.length) { totale += errori.length; righe.push(`${id} ERRORI PAGINA: ${errori.join(' | ')}`); }
     await c.close();

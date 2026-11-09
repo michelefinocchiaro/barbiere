@@ -1,11 +1,12 @@
 import './Sidebar.css'
 
-export type VoceNav = 'agenda' | 'promemoria' | 'clienti' | 'impostazioni'
+export type VoceNav = 'agenda' | 'promemoria' | 'clienti' | 'debiti' | 'impostazioni'
 
 interface Props {
   attiva: VoceNav
   onNaviga: (v: VoceNav) => void
   badgePromemoria: number | undefined
+  badgeDebiti: number | undefined
   logo: string
 }
 
@@ -13,6 +14,7 @@ const VOCI: { id: VoceNav; etichetta: string }[] = [
   { id: 'agenda', etichetta: 'Agenda' },
   { id: 'promemoria', etichetta: 'Promemoria' },
   { id: 'clienti', etichetta: 'Clienti' },
+  { id: 'debiti', etichetta: 'Da pagare' },
   { id: 'impostazioni', etichetta: 'Impostazioni' },
 ]
 
@@ -38,6 +40,13 @@ function IconaVoce({ voce }: { voce: VoceNav }) {
           <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
         </svg>
       )
+    case 'debiti':
+      return (
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="2" y="6" width="20" height="13" rx="2" />
+          <path d="M2 10h20M16 14h2" />
+        </svg>
+      )
     default:
       return (
         <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="2">
@@ -48,7 +57,7 @@ function IconaVoce({ voce }: { voce: VoceNav }) {
   }
 }
 
-export function Sidebar({ attiva, onNaviga, badgePromemoria, logo }: Props) {
+export function Sidebar({ attiva, onNaviga, badgePromemoria, badgeDebiti, logo }: Props) {
   return (
     <nav className="sidebar" aria-label="Menu principale">
       {logo ? (
@@ -70,6 +79,11 @@ export function Sidebar({ attiva, onNaviga, badgePromemoria, logo }: Props) {
               {v.id === 'promemoria' && badgePromemoria !== undefined && badgePromemoria > 0 ? (
                 <span className="sidebar-badge" aria-label={`${badgePromemoria} da inviare`}>
                   {badgePromemoria}
+                </span>
+              ) : null}
+              {v.id === 'debiti' && badgeDebiti !== undefined && badgeDebiti > 0 ? (
+                <span className="sidebar-badge" aria-label={`${badgeDebiti} da incassare`}>
+                  {badgeDebiti}
                 </span>
               ) : null}
             </button>

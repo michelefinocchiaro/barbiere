@@ -7,6 +7,7 @@ import { Clienti } from './clienti/Clienti'
 import { ImpostazioniSchermata } from './impostazioni/Impostazioni'
 import { Layout } from './layout/Layout'
 import type { VoceNav } from './layout/Sidebar'
+import { DaPagare } from './debiti/DaPagare'
 import { Promemoria } from './promemoria/Promemoria'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Benvenuto } from './components/Benvenuto'
@@ -58,6 +59,7 @@ export default function App() {
           ) : null}
           {voce === 'promemoria' ? <Promemoria onToast={onToast} /> : null}
           {voce === 'clienti' ? <Clienti /> : null}
+          {voce === 'debiti' ? <DaPagare onToast={onToast} /> : null}
           {voce === 'impostazioni' ? <ImpostazioniSchermata /> : null}
         </ErrorBoundary>
         {mostraBenvenuto ? (

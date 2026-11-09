@@ -1,0 +1,317 @@
+.da-pagare {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 1rem 1rem;
+  overflow: hidden;
+}
+
+.debiti-caricamento {
+  padding: 2rem;
+  color: var(--tc-argento);
+}
+
+.debiti-intestazione {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--tc-argento-scuro);
+}
+
+.debiti-intestazione h1 {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.debiti-etichetta-incassare {
+  margin: 0;
+  font-size: var(--tc-fs-sm);
+  color: var(--tc-argento);
+}
+
+.debiti-importo-grande {
+  margin: 0.2rem 0 0;
+  font-size: 2rem;
+  line-height: 1.15;
+  color: var(--tc-crema);
+}
+
+@media (min-width: 701px) {
+  .debiti-importo-grande {
+    font-size: 2.4rem;
+  }
+}
+
+.debiti-sotto-totale {
+  margin: 0.25rem 0 0;
+  color: var(--tc-argento);
+  font-size: var(--tc-fs-sm);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.debiti-vuoto {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  flex: 1;
+}
+
+.debiti-vuoto-frase {
+  margin: 0;
+  font-size: var(--tc-fs-md);
+  color: var(--tc-crema);
+  max-width: 18rem;
+}
+
+.debiti-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.debiti-riga {
+  border-bottom: 1px solid var(--tc-argento-scuro);
+  padding: 0.65rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.debiti-riga-tap {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.35rem 0;
+  min-height: var(--tc-tocco-min);
+  color: var(--tc-crema);
+}
+
+.debiti-riga-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.debiti-cliente-nome {
+  font-weight: 600;
+  font-size: var(--tc-fs-md);
+}
+
+.debiti-data-servizio {
+  color: var(--tc-argento);
+  font-size: var(--tc-fs-sm);
+}
+
+.debiti-nota {
+  color: var(--tc-argento);
+  font-size: var(--tc-fs-sm);
+  font-style: italic;
+}
+
+.debiti-importo {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--tc-crema);
+}
+
+.btn-ha-pagato {
+  align-self: flex-start;
+  background: var(--tc-blu);
+  color: var(--tc-crema);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  min-height: var(--tc-tocco-min);
+}
+
+.debiti-piede {
+  flex-shrink: 0;
+  padding: 0.75rem 0 0;
+  border-top: 1px solid var(--tc-argento-scuro);
+}
+
+.btn-segna-debito {
+  width: 100%;
+  min-height: var(--tc-tocco-min);
+}
+
+.debiti-modulo-wrap {
+  flex-shrink: 0;
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--tc-superficie);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 8px;
+}
+
+.modulo-debito h3 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.modulo-debito .campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.modulo-debito .campo input {
+  padding: 0.5rem;
+  min-height: var(--tc-tocco-min);
+  background: var(--tc-nero);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  color: var(--tc-crema);
+}
+
+.modulo-debito .opzionale {
+  font-weight: 400;
+  color: var(--tc-argento);
+  font-size: 0.85em;
+}
+
+.modulo-debito .suggerimenti {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.modulo-debito .suggerimenti li button {
+  width: 100%;
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  min-height: var(--tc-tocco-min);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  color: var(--tc-crema);
+}
+
+.modulo-debito .suggerimenti li + li button {
+  border-top: 1px solid var(--tc-argento-scuro);
+}
+
+.modulo-debito-azioni {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.modulo-debito-azioni .btn-primario {
+  min-height: var(--tc-tocco-min);
+}
+
+.errore-debito {
+  color: var(--tc-rosso);
+  margin: 0 0 0.5rem;
+}
+
+.debiti-modifica {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--tc-superficie);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 8px;
+}
+
+.debiti-modifica h3 {
+  margin: 0 0 1rem;
+}
+
+.debiti-modifica .campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.debiti-modifica .campo input {
+  padding: 0.5rem;
+  min-height: var(--tc-tocco-min);
+  background: var(--tc-nero);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  color: var(--tc-crema);
+}
+
+.debiti-modifica-azioni {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.conferma-elimina-debito {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--tc-argento-scuro);
+}
+
+.btn-pericolo {
+  color: var(--tc-rosso);
+  font-weight: 600;
+  min-height: var(--tc-tocco-min);
+  padding: 0.5rem;
+}
+
+.modulo-debito .link-nuovo {
+  color: var(--tc-blu);
+  text-decoration: underline;
+  min-height: var(--tc-tocco-min);
+  padding: 0.5rem 0;
+}
+
+.modulo-debito .cliente-nuovo-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.modulo-debito .cliente-nuovo-form input {
+  padding: 0.5rem;
+  min-height: var(--tc-tocco-min);
+  background: var(--tc-nero);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  color: var(--tc-crema);
+}
+
+.modulo-debito .btn-primario,
+.btn-segna-debito,
+.debiti-modifica .btn-primario {
+  background: var(--tc-rosso);
+  color: var(--tc-crema);
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+}
+
+.modulo-debito .btn-primario {
+  width: 100%;
+}
+
+.modulo-debito .btn-primario:disabled {
+  opacity: 0.45;
+}

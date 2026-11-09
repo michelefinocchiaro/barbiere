@@ -26,6 +26,19 @@
   font-size: 1.15rem;
 }
 
+.pannello-intestazione:has(.pannello-indietro) h2 {
+  flex: 1;
+  text-align: center;
+}
+
+.pannello-indietro {
+  flex-shrink: 0;
+  padding: 0.25rem 0;
+  color: var(--tc-oro);
+  font-size: var(--tc-fs-sm);
+  white-space: nowrap;
+}
+
 .pannello-chiudi {
   font-size: 1.25rem;
   color: var(--tc-argento);

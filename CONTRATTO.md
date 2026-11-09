@@ -121,6 +121,22 @@ export interface Riepilogo {
   totale: number; daInviare: number; inviati: number; avvisatiTelefono: number; nonServe: number;
   inAttesa: number; confermati: number; disdetti: number;
 }
+/** Un conto lasciato aperto: il cliente ha fatto il servizio e paga la prossima volta. */
+export interface Debito {
+  id: string;
+  clienteId: string;
+  importoCent: number;          // in centesimi: 15,00 € = 1500. Sempre > 0
+  data: ISODate;                // il giorno del servizio
+  appuntamentoId?: string;      // se nasce da un appuntamento
+  nota?: string;                // "taglio + barba", "metà la prossima volta"
+  pagatoIl?: string;            // ISO 8601 completo; assente = ancora da pagare
+  creatoIl: string; aggiornatoIl: string;
+}
+
+/** Una riga della schermata "Da pagare", già pronta da mostrare. */
+export interface RigaDebito { debito: Debito; cliente: Cliente }
+
+export interface TotaleDaPagare { totaleCent: number; clienti: number; voci: number }
 ```
 
 ## Funzioni (`src/core/index.ts`)
@@ -202,6 +218,26 @@ riepilogo(data: ISODate): Promise<Riepilogo>               // i disdetti contano
 impostaEsitoPromemoria(id: string, esito: EsitoPromemoria): Promise<void>
 impostaTestoPromemoria(id: string, testo: string | null): Promise<void>  // null = torna al testo standard
 ```
+
+### Da pagare
+```ts
+segnaDaPagare(d: Omit<Debito,"id"|"creatoIl"|"aggiornatoIl"|"pagatoIl">): Promise<Debito>
+modificaDebito(id: string, campi: Partial<Pick<Debito,"importoCent"|"nota"|"data">>): Promise<void>
+segnaPagato(id: string, pagato: boolean): Promise<void>  // true imposta pagatoIl, false lo toglie (per Annulla)
+eliminaDebito(id: string): Promise<void>                  // per gli errori di battitura
+debitiAperti(): Promise<RigaDebito[]>                     // non pagati, dal più vecchio
+debitiCliente(clienteId: string): Promise<Debito[]>       // tutti, aperti prima, poi pagati dal più recente
+totaleDaPagare(): Promise<TotaleDaPagare>                 // solo gli aperti; clienti = clienti distinti
+formattaEuro(cent: number): string                        // 1500 -> "15,00 €", 50 -> "0,50 €", 123456 -> "1.234,56 €"
+leggiEuro(input: string): number | null                   // "15" "15,5" "15.50" "€ 15,50" -> centesimi; "", "abc", "0", negativi -> null
+```
+- `segnaDaPagare` rifiuta (lancia) `importoCent <= 0` o non intero: è l'unico controllo che blocca,
+  perché un importo sbagliato non è un avviso, è un dato rotto.
+- Il **backup** include la tabella `debiti`; `importaBackup` accetta anche i backup vecchi senza
+  `debiti` (tabella vuota). `caricaDatiDemo` aggiunge 2 debiti inventati su clienti demo diversi;
+  `svuotaTutto` li cancella.
+- Schema Dexie: nuova versione con la tabella `debiti` (indici: `id, clienteId, pagatoIl, data`),
+  senza perdere i dati della versione precedente.
 
 ### Impostazioni, backup, demo
 ```ts

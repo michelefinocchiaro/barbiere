@@ -77,3 +77,20 @@ export interface Riepilogo {
   totale: number; daInviare: number; inviati: number; avvisatiTelefono: number; nonServe: number;
   inAttesa: number; confermati: number; disdetti: number;
 }
+
+/** Un conto lasciato aperto: il cliente ha fatto il servizio e paga la prossima volta. */
+export interface Debito {
+  id: string;
+  clienteId: string;
+  importoCent: number;          // in centesimi: 15,00 € = 1500. Sempre > 0
+  data: ISODate;                // il giorno del servizio
+  appuntamentoId?: string;      // se nasce da un appuntamento
+  nota?: string;                // "taglio + barba", "metà la prossima volta"
+  pagatoIl?: string;            // ISO 8601 completo; assente = ancora da pagare
+  creatoIl: string; aggiornatoIl: string;
+}
+
+/** Una riga della schermata "Da pagare", già pronta da mostrare. */
+export interface RigaDebito { debito: Debito; cliente: Cliente }
+
+export interface TotaleDaPagare { totaleCent: number; clienti: number; voci: number }

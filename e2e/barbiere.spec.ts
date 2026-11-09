@@ -463,6 +463,114 @@ test.describe('design benvenuto e battute', () => {
   })
 })
 
+test.describe('Da pagare', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.clock.setFixedTime(SABATO)
+    await page.goto('/')
+    await caricaDemoEApriAgenda(page)
+  })
+
+  test('badge, totali, Ha pagato, Annulla e nuova voce', async ({ page }) => {
+    const navDebiti = page.getByRole('button', { name: /^Da pagare/ })
+    await expect(navDebiti).toBeVisible()
+    const badge = navDebiti.locator('.sidebar-badge')
+    await expect(badge).toHaveText('2')
+    const badgeBox = await badge.boundingBox()
+    expect(badgeBox?.height ?? 0).toBeGreaterThanOrEqual(10)
+
+    await navDebiti.click()
+    await expect(page.getByRole('heading', { name: 'Da pagare', level: 1 })).toBeVisible()
+    const totaleGrande = page.locator('.debiti-importo-grande').first()
+    await expect(totaleGrande).toHaveText('23,50 €')
+    const totBox = await totaleGrande.boundingBox()
+    expect(totBox?.height ?? 0).toBeGreaterThanOrEqual(28)
+
+    const rigaMario = page.locator('.debiti-riga').filter({ hasText: 'Mario Rossi' })
+    await expect(rigaMario).toBeVisible()
+    const rigaBox = await rigaMario.boundingBox()
+    expect(rigaBox?.height ?? 0).toBeGreaterThanOrEqual(60)
+
+    await rigaMario.getByRole('button', { name: 'Ha pagato' }).click()
+    await expect(page.locator('.debiti-riga')).toHaveCount(1)
+    await expect(totaleGrande).toHaveText('8,50 €')
+    await expect(badge).toHaveText('1')
+
+    await page.locator('.toast').getByRole('button', { name: 'Annulla' }).click()
+    await expect(page.locator('.debiti-riga')).toHaveCount(2)
+    await expect(totaleGrande).toHaveText('23,50 €')
+    await expect(badge).toHaveText('2')
+
+    await page.getByRole('button', { name: '+ Segna da pagare' }).click()
+    const modulo = page.locator('.modulo-debito')
+    await modulo.getByPlaceholder('Nome o ultime cifre del telefono').fill('Zzz Cliente Nuovo')
+    await modulo.locator('.link-nuovo').click()
+    await modulo.getByLabel('Nome').fill('Cliente Debito')
+    await modulo.getByLabel('Telefono').fill('333 000 0003')
+    await modulo.getByRole('button', { name: 'Aggiungi cliente' }).click()
+    await modulo.locator('input[placeholder="es. 15 o 12,50"]').fill('12,50')
+    await modulo.getByRole('button', { name: 'Salva da pagare', exact: true }).click()
+    await expect(page.getByText('12,50 €').first()).toBeVisible()
+    await expect(totaleGrande).toHaveText('36,00 €')
+
+    await page.getByRole('button', { name: '+ Segna da pagare' }).click()
+    const modulo2 = page.locator('.modulo-debito')
+    await modulo2.getByPlaceholder('Nome o ultime cifre del telefono').fill('Luigi')
+    await modulo2.locator('.suggerimenti button').first().click()
+    await modulo2.locator('input[placeholder="es. 15 o 12,50"]').fill('abc')
+    await modulo2.getByRole('button', { name: 'Salva da pagare', exact: true }).click()
+    await expect(modulo2.getByRole('alert')).toContainText(/importo/i)
+    await expect(modulo2).toBeVisible()
+  })
+
+  test('dal pannello appuntamento apre il modulo col cliente scelto', async ({ page }) => {
+    test.setTimeout(30_000)
+    await impostaDataAgenda(page, '2026-11-17')
+    await page.getByRole('button', { name: '9.00 Mario Rossi Taglio' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    const segnaNelPannello = dialog.getByRole('button', { name: 'Segna da pagare' })
+    await segnaNelPannello.scrollIntoViewIfNeeded()
+    await segnaNelPannello.click()
+    await expect(dialog.getByRole('heading', { name: 'Segna da pagare', level: 2 })).toBeVisible()
+    const campoCliente = dialog.locator('.modulo-debito input[type="search"]')
+    await expect(campoCliente).toHaveValue('Mario Rossi')
+    const modBox = await dialog.locator('.modulo-debito').boundingBox()
+    expect(modBox?.height ?? 0).toBeGreaterThanOrEqual(100)
+
+    const salvaNelDialog = dialog.getByRole('button', { name: /^Salva/ })
+    await expect(salvaNelDialog).toHaveCount(1)
+    await expect(salvaNelDialog).toHaveAccessibleName('Salva da pagare')
+
+    await dialog.locator('.modulo-debito input[placeholder="es. 15 o 12,50"]').fill('7')
+    await dialog.getByRole('button', { name: 'Salva da pagare', exact: true }).click()
+    await expect(dialog.getByRole('heading', { name: 'Modifica appuntamento', level: 2 })).toBeVisible()
+
+    await page.getByLabel('Chiudi').click()
+    await expect(dialog).toHaveCount(0)
+    await page.getByRole('button', { name: /^Da pagare/ }).click()
+    const rigaSette = page
+      .locator('.debiti-riga')
+      .filter({ hasText: 'Mario Rossi' })
+      .filter({ hasText: '7,00 €' })
+    await expect(rigaSette).toHaveCount(1)
+
+    await page.getByRole('button', { name: /^Agenda/ }).click()
+    await page.getByRole('button', { name: '9.00 Mario Rossi Taglio' }).click()
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('button', { name: 'Segna da pagare' }).scrollIntoViewIfNeeded()
+    await dialog.getByRole('button', { name: 'Segna da pagare' }).click()
+    await dialog.locator('.modulo-debito input[placeholder="es. 15 o 12,50"]').fill('7')
+    await dialog.getByRole('button', { name: 'Salva da pagare', exact: true }).click()
+    const toast = page.locator('.toast').filter({ hasText: 'Segnato da pagare' })
+    await expect(toast).toBeVisible()
+    await toast.getByRole('button', { name: 'Annulla' }).click({ force: true })
+
+    await page.getByLabel('Chiudi').click()
+    await page.getByRole('button', { name: /^Da pagare/ }).click()
+    await expect(rigaSette).toHaveCount(1)
+  })
+})
+
 test.describe('screenshot collaterale', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     const ok = testInfo.project.name === 'tablet-1280' || testInfo.project.name === 'telefono-390'

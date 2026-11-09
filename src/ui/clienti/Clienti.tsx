@@ -3,6 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import type { Cliente } from '../../core'
 import {
   cercaClienti,
+  debitiCliente,
+  formattaEuro,
   formattaOra,
   formattaTelefono,
   leggiImpostazioni,
@@ -93,6 +95,21 @@ function SchedaCliente({
   const [errore, setErrore] = useState('')
 
   const storico = useLiveQuery(() => storicoCliente(cliente.id), [cliente.id])
+  const debiti = useLiveQuery(() => debitiCliente(cliente.id), [cliente.id])
+
+  const debitiAperti = (debiti ?? []).filter((d) => !d.pagatoIl)
+  const debitiPagati = (debiti ?? []).filter((d) => d.pagatoIl)
+  const totaleApertoCent = debitiAperti.reduce((s, d) => s + d.importoCent, 0)
+
+  const formattaPagatoIl = (iso: string) => {
+    const d = new Date(iso)
+    return new Intl.DateTimeFormat('it-IT', {
+      timeZone: 'Europe/Rome',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(d)
+  }
 
   const salva = async () => {
     const norm = normalizzaTelefono(telefono, prefisso)
@@ -130,6 +147,33 @@ function SchedaCliente({
       <button type="button" className="btn-salva-cliente" onClick={() => void salva()}>
         Salva
       </button>
+
+      {debitiAperti.length > 0 ? (
+        <section className="cliente-debiti">
+          <h2>Da pagare</h2>
+          <p className="cliente-debiti-totale tabular-nums">
+            Totale: <strong>{formattaEuro(totaleApertoCent)}</strong>
+          </p>
+          <ul className="cliente-debiti-lista">
+            {debitiAperti.map((d) => (
+              <li key={d.id}>
+                <span className="tabular-nums">{formattaEuro(d.importoCent)}</span>
+                <span> · {formattaDataLunga(d.data)}</span>
+                {d.nota ? <span className="cliente-debiti-nota"> — {d.nota}</span> : null}
+              </li>
+            ))}
+          </ul>
+          {debitiPagati.length > 0 ? (
+            <ul className="cliente-debiti-pagati">
+              {debitiPagati.map((d) => (
+                <li key={d.id}>
+                  {formattaEuro(d.importoCent)} — pagato il {formattaPagatoIl(d.pagatoIl!)}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
 
       <h2>Storico appuntamenti</h2>
       <ul className="storico-lista">

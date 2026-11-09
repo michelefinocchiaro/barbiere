@@ -105,6 +105,54 @@
   color: var(--tc-argento);
 }
 
+.cliente-debiti {
+  margin: 1rem 0;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--tc-argento-scuro);
+}
+
+.cliente-debiti h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.cliente-debiti-totale {
+  margin: 0 0 0.5rem;
+  color: var(--tc-crema);
+}
+
+.cliente-debiti-lista,
+.cliente-debiti-pagati {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cliente-debiti-lista li {
+  padding: 0.35rem 0;
+}
+
+.cliente-debiti-nota {
+  color: var(--tc-argento);
+  font-style: italic;
+}
+
+.cliente-debiti-pagati {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--tc-argento-scuro);
+}
+
+.cliente-debiti-pagati li {
+  color: var(--tc-argento);
+  font-size: var(--tc-fs-sm);
+  padding: 0.25rem 0;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
 .storico-lista {
   margin: 0;
   padding-left: 1.25rem;

@@ -5,11 +5,15 @@ import {
   caricaDatiDemo,
   cercaClienti,
   db,
+  debitiAperti,
+  debitiCliente,
   eliminaAppuntamento,
+  eliminaDebito,
   esportaBackup,
   impostaTestoPromemoria,
   importaBackup,
   leggiImpostazioni,
+  modificaDebito,
   oggi,
   prossimoGiornoApertura,
   righePromemoria,
@@ -18,8 +22,11 @@ import {
   salvaBlocco,
   salvaCliente,
   salvaImpostazioni,
+  segnaDaPagare,
+  segnaPagato,
   spostaAppuntamento,
   svuotaTutto,
+  totaleDaPagare,
   trovaOCreaCliente,
   verificaAppuntamento,
 } from './index.ts'
@@ -46,6 +53,7 @@ beforeEach(async () => {
   await db.appuntamenti.clear()
   await db.blocchi.clear()
   await db.clienti.clear()
+  await db.debiti.clear()
   await db.impostazioni.clear()
 })
 
@@ -240,6 +248,87 @@ describe('riepilogo', () => {
   })
 })
 
+describe('debiti', () => {
+  it('segnaDaPagare rifiuta importi non validi e salva quelli validi', async () => {
+    await expect(segnaDaPagare({ clienteId: 'c1', importoCent: 0, data: dataAperta })).rejects.toThrow()
+    await expect(segnaDaPagare({ clienteId: 'c1', importoCent: -100, data: dataAperta })).rejects.toThrow()
+    await expect(segnaDaPagare({ clienteId: 'c1', importoCent: 15.5, data: dataAperta })).rejects.toThrow()
+
+    const debito = await segnaDaPagare({ clienteId: 'c1', importoCent: 1500, data: dataAperta })
+    expect(debito.importoCent).toBe(1500)
+    const aperti = await debitiAperti()
+    expect(aperti).toHaveLength(1)
+    expect(aperti[0].debito.id).toBe(debito.id)
+  })
+
+  it('segnaPagato toglie e rimette il debito dagli aperti', async () => {
+    const debito = await segnaDaPagare({ clienteId: 'c1', importoCent: 1000, data: dataAperta })
+    expect((await debitiAperti()).map((d) => d.debito.id)).toContain(debito.id)
+
+    await segnaPagato(debito.id, true)
+    const pagato = await db.debiti.get(debito.id)
+    expect(pagato?.pagatoIl).toBeDefined()
+    expect((await debitiAperti()).map((d) => d.debito.id)).not.toContain(debito.id)
+
+    await segnaPagato(debito.id, false)
+    const annullato = await db.debiti.get(debito.id)
+    expect(annullato?.pagatoIl).toBeUndefined()
+    expect((await debitiAperti()).map((d) => d.debito.id)).toContain(debito.id)
+  })
+
+  it('debitiAperti è ordinato dal più vecchio e include il cliente giusto', async () => {
+    const mario = await clienteDemo('c1', 'Mario', '393330000001')
+    const luigi = await clienteDemo('c2', 'Luigi', '393330000002')
+    await segnaDaPagare({ clienteId: mario.id, importoCent: 1000, data: '2026-11-20' })
+    await segnaDaPagare({ clienteId: luigi.id, importoCent: 2000, data: '2026-11-18' })
+    await segnaDaPagare({ clienteId: mario.id, importoCent: 500, data: '2026-11-19' })
+
+    const aperti = await debitiAperti()
+    expect(aperti.map((d) => d.debito.data)).toEqual(['2026-11-18', '2026-11-19', '2026-11-20'])
+    expect(aperti.map((d) => d.cliente.nome)).toEqual(['Luigi', 'Mario', 'Mario'])
+  })
+
+  it('totaleDaPagare conta solo gli aperti', async () => {
+    await segnaDaPagare({ clienteId: 'c1', importoCent: 1000, data: dataAperta })
+    await segnaDaPagare({ clienteId: 'c1', importoCent: 2000, data: dataAperta })
+    const pagato = await segnaDaPagare({ clienteId: 'c2', importoCent: 500, data: dataAperta })
+    await segnaDaPagare({ clienteId: 'c2', importoCent: 1500, data: dataAperta })
+    await segnaPagato(pagato.id, true)
+
+    const totale = await totaleDaPagare()
+    expect(totale).toEqual({ totaleCent: 4500, clienti: 2, voci: 3 })
+  })
+
+  it('debitiCliente mette aperti prima e pagati dal più recente', async () => {
+    const mario = await clienteDemo('c1', 'Mario', '393330000001')
+    const aperto = await segnaDaPagare({ clienteId: mario.id, importoCent: 1000, data: '2026-11-15' })
+    const pagatoVecchio = await segnaDaPagare({ clienteId: mario.id, importoCent: 500, data: '2026-11-10' })
+    const pagatoRecente = await segnaDaPagare({ clienteId: mario.id, importoCent: 800, data: '2026-11-12' })
+    await segnaPagato(pagatoVecchio.id, true)
+    await segnaPagato(pagatoRecente.id, true)
+
+    const lista = await debitiCliente(mario.id)
+    expect(lista[0].id).toBe(aperto.id)
+    expect(lista[1].id).toBe(pagatoRecente.id)
+    expect(lista[2].id).toBe(pagatoVecchio.id)
+  })
+
+  it('modificaDebito aggiorna importo, nota e data', async () => {
+    const debito = await segnaDaPagare({ clienteId: 'c1', importoCent: 1000, data: dataAperta, nota: 'prima' })
+    await modificaDebito(debito.id, { importoCent: 1200, nota: 'dopo', data: '2026-11-20' })
+    const aggiornato = await db.debiti.get(debito.id)
+    expect(aggiornato?.importoCent).toBe(1200)
+    expect(aggiornato?.nota).toBe('dopo')
+    expect(aggiornato?.data).toBe('2026-11-20')
+  })
+
+  it('eliminaDebito rimuove il debito', async () => {
+    const debito = await segnaDaPagare({ clienteId: 'c1', importoCent: 1000, data: dataAperta })
+    await eliminaDebito(debito.id)
+    expect(await db.debiti.get(debito.id)).toBeUndefined()
+  })
+})
+
 describe('backup', () => {
   it('esporta, svuota e reimporta tutti i campi', async () => {
     const impConTutto: Impostazioni = {
@@ -282,9 +371,12 @@ describe('backup', () => {
     }
     await salvaBlocco(blocco)
 
+    await segnaDaPagare({ clienteId: cliente.id, importoCent: 1500, data: dataAperta, nota: 'Taglio' })
+
     const clientiPrima = await db.clienti.toArray()
     const appuntamentiPrima = await db.appuntamenti.toArray()
     const blocchiPrima = await db.blocchi.toArray()
+    const debitiPrima = await db.debiti.toArray()
 
     const blob = await esportaBackup()
     await svuotaTutto()
@@ -296,11 +388,13 @@ describe('backup', () => {
     const clientiDopo = await db.clienti.toArray()
     const appuntamentiDopo = await db.appuntamenti.toArray()
     const blocchiDopo = await db.blocchi.toArray()
+    const debitiDopo = await db.debiti.toArray()
     const impDopo = await leggiImpostazioni()
 
     expect(clientiDopo).toEqual(clientiPrima)
     expect(appuntamentiDopo).toEqual(appuntamentiPrima)
     expect(blocchiDopo).toEqual(blocchiPrima)
+    expect(debitiDopo).toEqual(debitiPrima)
 
     const {
       ultimoBackupIl: _dopo,
@@ -322,6 +416,12 @@ describe('backup', () => {
   it('rifiuta versioni sconosciute', async () => {
     const blob = new Blob([JSON.stringify({ versione: 99, clienti: [], appuntamenti: [], blocchi: [] })])
     await expect(importaBackup(blob)).rejects.toThrow('Versione backup non supportata')
+  })
+
+  it('accetta backup senza debiti lasciando la tabella vuota', async () => {
+    const blob = new Blob([JSON.stringify({ versione: 1, clienti: [], appuntamenti: [], blocchi: [] })])
+    await importaBackup(blob)
+    expect(await db.debiti.toArray()).toEqual([])
   })
 })
 
@@ -384,5 +484,15 @@ describe('caricaDatiDemo', () => {
     for (const c of clienti) {
       expect(nomiOperatori.has(c.nome)).toBe(false)
     }
+  })
+
+  it('aggiunge 2 debiti aperti su 2 clienti diversi e svuotaTutto li cancella', async () => {
+    await caricaDatiDemo()
+    const aperti = await debitiAperti()
+    expect(aperti).toHaveLength(2)
+    expect(new Set(aperti.map((d) => d.debito.clienteId)).size).toBe(2)
+
+    await svuotaTutto()
+    expect(await db.debiti.toArray()).toHaveLength(0)
   })
 })

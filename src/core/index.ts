@@ -7,13 +7,16 @@ import type {
   Avviso,
   Blocco,
   Cliente,
+  Debito,
   EsitoPromemoria,
   HHMM,
   Impostazioni,
   ISODate,
   Riepilogo,
+  RigaDebito,
   RigaPromemoria,
   StatoAppuntamento,
+  TotaleDaPagare,
 } from './tipi.ts'
 import { FRASI_PREDEFINITE, fraseDelMomento, momentoDellaGiornata } from './frasi.ts'
 
@@ -23,6 +26,7 @@ export type {
   Blocco,
   Cliente,
   ContestoFrase,
+  Debito,
   EsitoPromemoria,
   HHMM,
   Impostazioni,
@@ -30,10 +34,12 @@ export type {
   MomentoFrase,
   Operatore,
   Riepilogo,
+  RigaDebito,
   RigaPromemoria,
   Servizio,
   StatoAppuntamento,
   TipoAvviso,
+  TotaleDaPagare,
 } from './tipi.ts'
 
 export { FRASI_PREDEFINITE, fraseDelMomento, momentoDellaGiornata }
@@ -43,6 +49,7 @@ export const db = new Dexie('barbiere') as Dexie & {
   clienti: Table<Cliente, string>
   appuntamenti: Table<Appuntamento, string>
   blocchi: Table<Blocco, string>
+  debiti: Table<Debito, string>
   impostazioni: Table<{ id: string; valore: Impostazioni }, string>
 }
 
@@ -51,6 +58,10 @@ db.version(1).stores({
   appuntamenti: 'id, data, operatoreId, clienteId, stato, aggiornatoIl',
   blocchi: 'id, data, operatoreId',
   impostazioni: 'id',
+})
+
+db.version(2).stores({
+  debiti: 'id, clienteId, pagatoIl, data',
 })
 
 // Helper
@@ -180,6 +191,44 @@ export function formattaTelefono(normalizzato: string): string {
 export function formattaOra(ora: HHMM): string {
   const [h, m] = ora.split(':')
   return `${Number(h)}.${m}`
+}
+
+export function formattaEuro(cent: number): string {
+  const intero = Math.floor(cent / 100)
+  const decimali = String(cent % 100).padStart(2, '0')
+  const interoFormattato = String(intero).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `${interoFormattato},${decimali} €`
+}
+
+export function leggiEuro(input: string): number | null {
+  const pulito = input
+    .replace(/\s/g, '')
+    .replace(/\u20AC/g, '')
+    .replace(/€/g, '')
+  if (!pulito) return null
+  if (/[^\d,.]/.test(pulito)) return null
+  if (pulito.includes('-')) return null
+
+  const virgole = (pulito.match(/,/g) ?? []).length
+  const punti = (pulito.match(/\./g) ?? []).length
+  if (virgole + punti > 1) return null
+
+  const separatore = virgole > 0 ? ',' : punti > 0 ? '.' : null
+  let [interoStr, decimaleStr = '00'] = separatore
+    ? pulito.split(separatore)
+    : [pulito, '00']
+
+  if (interoStr === '') interoStr = '0'
+  if (!/^\d+$/.test(interoStr)) return null
+  if (!/^\d+$/.test(decimaleStr)) return null
+  if (decimaleStr.length > 2) return null
+
+  const intero = Number(interoStr)
+  const decimale = decimaleStr.padEnd(2, '0').slice(0, 2)
+  const cent = intero * 100 + Number(decimale)
+
+  if (cent <= 0 || !Number.isFinite(cent)) return null
+  return cent
 }
 
 export function quando(dataAppuntamento: ISODate, oggi: ISODate): string {
@@ -457,6 +506,66 @@ export async function impostaTestoPromemoria(id: string, testo: string | null): 
   })
 }
 
+// Da pagare
+export async function segnaDaPagare(
+  d: Omit<Debito, 'id' | 'creatoIl' | 'aggiornatoIl' | 'pagatoIl'>,
+): Promise<Debito> {
+  if (!Number.isInteger(d.importoCent) || d.importoCent <= 0) {
+    throw new Error('Importo non valido')
+  }
+  const now = new Date().toISOString()
+  const debito: Debito = {
+    ...d,
+    id: crypto.randomUUID(),
+    creatoIl: now,
+    aggiornatoIl: now,
+  }
+  await db.debiti.add(debito)
+  return debito
+}
+
+export async function modificaDebito(
+  id: string,
+  campi: Partial<Pick<Debito, 'importoCent' | 'nota' | 'data'>>,
+): Promise<void> {
+  if (campi.importoCent !== undefined && (!Number.isInteger(campi.importoCent) || campi.importoCent <= 0)) {
+    throw new Error('Importo non valido')
+  }
+  await db.debiti.update(id, { ...campi, aggiornatoIl: new Date().toISOString() })
+}
+
+export async function segnaPagato(id: string, pagato: boolean): Promise<void> {
+  const pagatoIl = pagato ? new Date().toISOString() : undefined
+  await db.debiti.update(id, { pagatoIl, aggiornatoIl: new Date().toISOString() })
+}
+
+export async function eliminaDebito(id: string): Promise<void> {
+  await db.debiti.delete(id)
+}
+
+export async function debitiAperti(): Promise<RigaDebito[]> {
+  const debiti = (await db.debiti.filter((d) => d.pagatoIl === undefined).toArray())
+    .sort((a, b) => a.data.localeCompare(b.data))
+  const clienteIds = [...new Set(debiti.map((d) => d.clienteId))]
+  const clienti = await db.clienti.where('id').anyOf(clienteIds).toArray()
+  const clientiMap = new Map(clienti.map((c) => [c.id, c]))
+  return debiti.map((debito) => ({ debito, cliente: clientiMap.get(debito.clienteId)! }))
+}
+
+export async function debitiCliente(clienteId: string): Promise<Debito[]> {
+  const tutti = await db.debiti.where('clienteId').equals(clienteId).sortBy('data')
+  const aperti = tutti.filter((d) => d.pagatoIl === undefined)
+  const pagati = tutti.filter((d) => d.pagatoIl !== undefined).sort((a, b) => b.data.localeCompare(a.data))
+  return [...aperti, ...pagati]
+}
+
+export async function totaleDaPagare(): Promise<TotaleDaPagare> {
+  const aperti = (await db.debiti.filter((d) => d.pagatoIl === undefined).toArray())
+  const totaleCent = aperti.reduce((sum, d) => sum + d.importoCent, 0)
+  const clienti = new Set(aperti.map((d) => d.clienteId)).size
+  return { totaleCent, clienti, voci: aperti.length }
+}
+
 // Impostazioni, backup, demo
 export async function leggiImpostazioni(): Promise<Impostazioni> {
   const row = await db.impostazioni.get('impostazioni')
@@ -475,10 +584,11 @@ export async function salvaImpostazioni(imp: Impostazioni): Promise<void> {
 }
 
 export async function esportaBackup(): Promise<Blob> {
-  const [clienti, appuntamenti, blocchi, imp] = await Promise.all([
+  const [clienti, appuntamenti, blocchi, debiti, imp] = await Promise.all([
     db.clienti.toArray(),
     db.appuntamenti.toArray(),
     db.blocchi.toArray(),
+    db.debiti.toArray(),
     leggiImpostazioni(),
   ])
   const esportatoIl = new Date().toISOString()
@@ -490,6 +600,7 @@ export async function esportaBackup(): Promise<Blob> {
     clienti,
     appuntamenti,
     blocchi,
+    debiti,
     impostazioni: impAgg,
   }
   return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
@@ -499,14 +610,16 @@ export async function importaBackup(file: Blob): Promise<{ clienti: number; appu
   const testo = await file.text()
   const payload = JSON.parse(testo)
   if (payload.versione !== 1) throw new Error('Versione backup non supportata')
-  await db.transaction('rw', db.clienti, db.appuntamenti, db.blocchi, db.impostazioni, async () => {
+  await db.transaction('rw', db.clienti, db.appuntamenti, db.blocchi, db.debiti, db.impostazioni, async () => {
     await db.clienti.clear()
     await db.appuntamenti.clear()
     await db.blocchi.clear()
+    await db.debiti.clear()
     await db.impostazioni.clear()
     await db.clienti.bulkAdd(payload.clienti ?? [])
     await db.appuntamenti.bulkAdd(payload.appuntamenti ?? [])
     await db.blocchi.bulkAdd(payload.blocchi ?? [])
+    await db.debiti.bulkAdd(payload.debiti ?? [])
     if (payload.impostazioni) {
       await db.impostazioni.add({
         id: 'impostazioni',
@@ -623,13 +736,36 @@ export async function caricaDatiDemo(): Promise<void> {
     },
   ]
   await db.appuntamenti.bulkAdd(appuntamenti)
+
+  const debitiDemo: Debito[] = [
+    {
+      id: crypto.randomUUID(),
+      clienteId: clienti[0].id,
+      importoCent: 1500,
+      data: prossimo,
+      nota: 'Taglio + barba',
+      creatoIl: ts,
+      aggiornatoIl: ts,
+    },
+    {
+      id: crypto.randomUUID(),
+      clienteId: clienti[1].id,
+      importoCent: 850,
+      data: prossimo,
+      nota: 'Metà la prossima volta',
+      creatoIl: ts,
+      aggiornatoIl: ts,
+    },
+  ]
+  await db.debiti.bulkAdd(debitiDemo)
 }
 
 export async function svuotaTutto(): Promise<void> {
-  await db.transaction('rw', db.clienti, db.appuntamenti, db.blocchi, db.impostazioni, async () => {
+  await db.transaction('rw', db.clienti, db.appuntamenti, db.blocchi, db.debiti, db.impostazioni, async () => {
     await db.clienti.clear()
     await db.appuntamenti.clear()
     await db.blocchi.clear()
+    await db.debiti.clear()
     await db.impostazioni.clear()
   })
 }
