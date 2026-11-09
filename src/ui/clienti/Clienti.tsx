@@ -11,6 +11,7 @@ import {
   storicoCliente,
   tuttiIClienti,
 } from '../../core'
+import { formattaDataLunga } from '../utils/dateUi'
 import './Clienti.css'
 
 export function Clienti() {
@@ -134,7 +135,7 @@ function SchedaCliente({
       <ul className="storico-lista">
         {(storico ?? []).map((a) => (
           <li key={a.id}>
-            {a.data} {formattaOra(a.ora)} — {a.stato}
+            {formattaDataLunga(a.data)}, {formattaOra(a.ora)} · {a.stato}
           </li>
         ))}
       </ul>

@@ -270,6 +270,20 @@ test.describe('agenda dati demo', () => {
     await caricaDemoEApriAgenda(page)
   })
 
+  test('ricerca cliente: il suggerimento si vede davvero e si sceglie', async ({ page }) => {
+    await impostaDataAgenda(page, '2026-11-17')
+    await page.getByRole('button', { name: /Nuovo appuntamento 12:00/i }).first().click()
+    await page.getByPlaceholder('Nome o ultime cifre del telefono').fill('Lui')
+    const voce = page.locator('.suggerimenti li').first()
+    await expect(voce).toBeVisible()
+    const box = await voce.boundingBox()
+    // toBeVisible è vero anche per una lista schiacciata a 2 px: serve l'altezza vera
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(30)
+    await voce.getByRole('button').first().click()
+    await expect(page.locator('.suggerimenti')).toHaveCount(0)
+    await expect(page.getByRole('searchbox', { name: 'Cliente' })).toHaveValue('Luigi Bianchi')
+  })
+
   test('martedì 17/11 — blocchi demo visibili e allineati alla griglia', async ({ page }) => {
     await impostaDataAgenda(page, '2026-11-17')
     const blocchi = page.locator('.app-blocco')

@@ -250,3 +250,9 @@
   margin: 0.5rem 0 0;
   padding-left: 1.25rem;
 }
+
+/* Il corpo del pannello scorre: i suoi figli non si schiacciano (la lista dei
+   suggerimenti, con overflow hidden, finiva alta 2 px e invisibile). */
+.pannello-corpo > * {
+  flex-shrink: 0;
+}
