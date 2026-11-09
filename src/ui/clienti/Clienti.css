@@ -1,0 +1,131 @@
+.clienti {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 1rem 1rem;
+}
+
+.clienti-intestazione {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--tc-argento-scuro);
+}
+
+.clienti-intestazione h1 {
+  margin: 0;
+}
+
+.clienti-cerca {
+  flex: 1;
+  min-width: 12rem;
+  background: var(--tc-superficie);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  padding: 0.65rem 1rem;
+  min-height: var(--tc-tocco-min);
+  color: var(--tc-crema);
+}
+
+.clienti-corpo {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 1.5fr;
+  gap: 1rem;
+  min-height: 0;
+  padding-top: 0.75rem;
+}
+
+.clienti-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 8px;
+}
+
+.cliente-voce {
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--tc-argento-scuro);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-height: var(--tc-tocco-min);
+}
+
+.cliente-voce.attivo {
+  background: rgba(200, 50, 58, 0.12);
+}
+
+.cliente-tel {
+  color: var(--tc-argento);
+  font-size: 0.9rem;
+}
+
+.clienti-scegli {
+  color: var(--tc-argento);
+  align-self: center;
+  justify-self: center;
+}
+
+.cliente-scheda {
+  overflow: auto;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cliente-scheda label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--tc-argento);
+}
+
+.cliente-scheda input,
+.cliente-scheda textarea {
+  background: var(--tc-superficie);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  padding: 0.65rem;
+  min-height: var(--tc-tocco-min);
+  color: var(--tc-crema);
+}
+
+.cliente-scheda h2 {
+  margin: 1rem 0 0.5rem;
+  font-size: 1rem;
+  color: var(--tc-argento);
+}
+
+.storico-lista {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--tc-argento);
+}
+
+.btn-salva-cliente {
+  background: var(--tc-rosso);
+  color: var(--tc-crema);
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.errore {
+  color: var(--tc-rosso);
+  margin: 0;
+}
+
+@media (max-width: 800px) {
+  .clienti-corpo {
+    grid-template-columns: 1fr;
+  }
+}

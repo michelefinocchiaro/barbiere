@@ -1,0 +1,17 @@
+/* Copia da public/brand/palette.css — non modificare l'originale */
+:root {
+  --tc-nero: #0b0a0b;
+  --tc-superficie: #1c1b1e;
+  --tc-argento-scuro: #4d4d54;
+  --tc-argento: #8f8e94;
+  --tc-crema: #eae8e0;
+  --tc-rosso: #c8323a;
+  --tc-rosso-scuro: #871b28;
+  --tc-blu: #386993;
+
+  --tc-testo-base: 18px;
+  --tc-tocco-min: 48px;
+  --tc-sidebar-w: 200px;
+  --tc-slot-h: 48px;
+  --tc-font: system-ui, 'Segoe UI', sans-serif;
+}

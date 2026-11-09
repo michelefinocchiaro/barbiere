@@ -1,0 +1,39 @@
+.avvisi-fascia {
+  background: #c9a227;
+  color: #1a1500;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.avvisi-fascia ul {
+  margin: 0 0 0.75rem;
+  padding-left: 1.25rem;
+}
+
+.avvisi-fascia li {
+  margin: 0.25rem 0;
+}
+
+.avvisi-azioni {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.avvisi-azioni .btn-primario {
+  background: var(--tc-rosso);
+  color: var(--tc-crema);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  min-width: auto;
+  font-weight: 600;
+}
+
+.avvisi-azioni .btn-secondario {
+  background: transparent;
+  color: #1a1500;
+  text-decoration: underline;
+  min-width: auto;
+  padding: 0.5rem 1rem;
+}

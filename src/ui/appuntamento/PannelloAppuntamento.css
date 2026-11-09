@@ -1,0 +1,252 @@
+.pannello-app {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 40vw);
+  background: var(--tc-superficie);
+  border-left: 1px solid var(--tc-argento-scuro);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
+}
+
+.pannello-intestazione {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid var(--tc-argento-scuro);
+}
+
+.pannello-intestazione h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.pannello-chiudi {
+  min-width: auto;
+  font-size: 1.25rem;
+  color: var(--tc-argento);
+}
+
+.pannello-corpo {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.campo,
+.campi-riga label,
+.cliente-nuovo-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--tc-argento);
+}
+
+.campo input,
+.campo textarea,
+.cliente-nuovo-form input,
+.campi-riga input,
+.campi-riga select,
+.sposta-box input,
+.sposta-box select {
+  background: var(--tc-nero);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  padding: 0.65rem;
+  min-height: var(--tc-tocco-min);
+  color: var(--tc-crema);
+}
+
+.suggerimenti {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.suggerimenti button {
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--tc-argento-scuro);
+  min-height: var(--tc-tocco-min);
+}
+
+.suggerimenti button:last-child {
+  border-bottom: none;
+}
+
+.suggerimenti button:hover {
+  background: rgba(56, 105, 147, 0.2);
+}
+
+.link-nuovo {
+  color: var(--tc-blu);
+  text-decoration: underline;
+  min-height: auto;
+}
+
+.etichetta-sezione {
+  display: block;
+  color: var(--tc-argento);
+  margin-bottom: 0.5rem;
+}
+
+.griglia-servizi {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.btn-servizio {
+  background: var(--tc-nero);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: var(--tc-tocco-min);
+}
+
+.btn-servizio.attivo {
+  border-color: var(--tc-rosso);
+  background: rgba(200, 50, 58, 0.12);
+}
+
+.btn-servizio small {
+  color: var(--tc-argento);
+  font-size: 0.85rem;
+}
+
+.durata-riga {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.durata-riga button {
+  background: var(--tc-nero);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  min-width: auto;
+}
+
+.campi-riga {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.toggle-provvisorio {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-primario {
+  background: var(--tc-rosso);
+  color: var(--tc-crema);
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  width: 100%;
+}
+
+.btn-primario:disabled {
+  opacity: 0.45;
+}
+
+.btn-salva {
+  margin-top: 0.5rem;
+}
+
+.telefono-grande {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.telefono-grande a {
+  color: var(--tc-crema);
+  text-decoration: none;
+}
+
+.azioni-modifica {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--tc-argento-scuro);
+}
+
+.azioni-modifica button {
+  flex: 1;
+  min-width: calc(50% - 0.25rem);
+  background: var(--tc-nero);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  padding: 0.65rem;
+}
+
+.btn-disdici {
+  color: var(--tc-argento);
+}
+
+.btn-pericolo {
+  color: var(--tc-rosso) !important;
+  border-color: var(--tc-rosso) !important;
+}
+
+.conferma-elimina {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.sposta-box {
+  background: var(--tc-nero);
+  padding: 0.75rem;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sposta-azioni {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sposta-azioni button {
+  flex: 1;
+  background: var(--tc-superficie);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  padding: 0.65rem;
+}
+
+.storico-cliente {
+  color: var(--tc-argento);
+  font-size: 0.9rem;
+}
+
+.storico-cliente ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}

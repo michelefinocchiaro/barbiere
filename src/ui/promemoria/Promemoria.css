@@ -1,0 +1,233 @@
+.promemoria {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 1rem 1rem;
+  overflow: hidden;
+}
+
+.prom-caricamento {
+  padding: 2rem;
+  color: var(--tc-argento);
+}
+
+.prom-intestazione {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--tc-argento-scuro);
+}
+
+.prom-intestazione h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.prom-data input {
+  background: var(--tc-superficie);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  padding: 0.5rem;
+  min-height: var(--tc-tocco-min);
+  color: var(--tc-crema);
+}
+
+.prom-riepilogo {
+  padding: 0.75rem 0;
+  color: var(--tc-argento);
+}
+
+.prom-riepilogo p {
+  margin: 0 0 0.5rem;
+}
+
+.prom-barra {
+  height: 8px;
+  background: var(--tc-superficie);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.prom-barra-fill {
+  height: 100%;
+  background: var(--tc-rosso);
+  transition: width 0.3s;
+}
+
+.prom-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.prom-riga {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--tc-argento-scuro);
+  align-items: center;
+}
+
+.prom-riga.in-attesa {
+  background: rgba(200, 50, 58, 0.06);
+}
+
+.prom-riga-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+}
+
+.prom-ora {
+  font-weight: 700;
+  color: var(--tc-blu);
+  min-width: 4rem;
+}
+
+.prom-cliente {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.prom-dettagli {
+  color: var(--tc-argento);
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+.prom-riga-azioni {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.btn-invia {
+  background: var(--tc-rosso);
+  color: var(--tc-crema);
+  font-weight: 600;
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: auto;
+  text-decoration: none;
+  border: none;
+}
+
+.btn-invia:active {
+  background: var(--tc-rosso-scuro);
+}
+
+.btn-menu {
+  min-width: var(--tc-tocco-min);
+  background: var(--tc-superficie);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+}
+
+.menu-wrap {
+  position: relative;
+}
+
+.menu-dropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background: var(--tc-superficie);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-width: 12rem;
+}
+
+.menu-dropdown button {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--tc-argento-scuro);
+  min-height: var(--tc-tocco-min);
+}
+
+.btn-conferma {
+  background: var(--tc-blu);
+  color: var(--tc-crema);
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  min-width: auto;
+}
+
+.btn-disdetto {
+  border: 1px solid var(--tc-argento-scuro);
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  min-width: auto;
+}
+
+.conferma-disdetto {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.etichetta-chiusa {
+  color: var(--tc-argento);
+  font-size: 0.95rem;
+  text-decoration: underline;
+  min-width: auto;
+  padding: 0.5rem;
+}
+
+.prom-testo-riga {
+  grid-column: 1 / -1;
+}
+
+.btn-modifica-testo {
+  color: var(--tc-blu);
+  font-size: 0.9rem;
+  min-height: auto;
+  padding: 0.25rem 0;
+}
+
+.btn-modifica-testo.ritoccato {
+  color: var(--tc-crema);
+}
+
+.prom-testo-editor textarea {
+  width: 100%;
+  background: var(--tc-nero);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  padding: 0.75rem;
+  color: var(--tc-crema);
+  margin-top: 0.5rem;
+}
+
+.prom-testo-azioni {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.prom-testo-azioni button {
+  background: var(--tc-superficie);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  min-width: auto;
+}

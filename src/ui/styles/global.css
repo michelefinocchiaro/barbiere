@@ -1,0 +1,63 @@
+@import './variables.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: var(--tc-testo-base);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--tc-font);
+  background: var(--tc-nero);
+  color: var(--tc-crema);
+  line-height: 1.4;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  min-height: var(--tc-tocco-min);
+  min-width: var(--tc-tocco-min);
+}
+
+a {
+  color: var(--tc-blu);
+}
+
+:focus-visible {
+  outline: 2px solid var(--tc-blu);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

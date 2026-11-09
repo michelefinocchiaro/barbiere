@@ -1,0 +1,11 @@
+/* Toma Capelli — palette estratta dal logo (9/11/2026) */
+:root {
+  --tc-nero:          #0B0A0B; /* sfondo */
+  --tc-superficie:    #1C1B1E; /* card, pannelli */
+  --tc-argento-scuro: #4D4D54; /* bordi, testo secondario su crema */
+  --tc-argento:       #8F8E94; /* testo secondario su nero */
+  --tc-crema:         #EAE8E0; /* testo principale su nero, banner */
+  --tc-rosso:         #C8323A; /* accento: nastro "TOMA CAPELLI" */
+  --tc-rosso-scuro:   #871B28; /* pulsante premuto, ombra del nastro */
+  --tc-blu:           #386993; /* accento secondario: strisce del palo */
+}

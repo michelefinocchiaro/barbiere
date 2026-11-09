@@ -1,0 +1,243 @@
+.impostazioni {
+  flex: 1;
+  overflow: auto;
+  padding: 0 1rem 2rem;
+}
+
+.imp-caricamento {
+  padding: 2rem;
+  color: var(--tc-argento);
+}
+
+.imp-intestazione {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--tc-argento-scuro);
+  position: sticky;
+  top: 0;
+  background: var(--tc-nero);
+  z-index: 10;
+}
+
+.imp-intestazione h1 {
+  margin: 0;
+}
+
+.btn-salva-imp {
+  background: var(--tc-rosso);
+  color: var(--tc-crema);
+  font-weight: 600;
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  min-width: auto;
+}
+
+.imp-sezioni {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-top: 1rem;
+}
+
+.imp-sezione {
+  background: var(--tc-superficie);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+}
+
+.imp-sezione h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  color: var(--tc-crema);
+}
+
+.imp-testo {
+  width: 100%;
+  background: var(--tc-nero);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  padding: 0.75rem;
+  color: var(--tc-crema);
+  font-family: inherit;
+}
+
+.imp-segnaposto {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.imp-segnaposto button {
+  background: var(--tc-blu);
+  color: var(--tc-crema);
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  min-height: auto;
+}
+
+.imp-anteprima {
+  background: #075e54;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-top: 0.5rem;
+}
+
+.imp-anteprima-etichetta {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.imp-anteprima pre {
+  margin: 0.5rem 0 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  color: #e5ddd5;
+}
+
+.imp-riga {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.imp-riga label,
+.imp-sezione > label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--tc-argento);
+}
+
+.imp-riga input,
+.imp-sezione input[type='time'],
+.imp-sezione input[type='date'],
+.imp-sezione input[type='number'] {
+  background: var(--tc-nero);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  padding: 0.5rem;
+  min-height: var(--tc-tocco-min);
+  color: var(--tc-crema);
+}
+
+.imp-giorni {
+  border: none;
+  margin-top: 1rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+}
+
+.imp-giorni legend {
+  width: 100%;
+  color: var(--tc-argento);
+  margin-bottom: 0.5rem;
+}
+
+.imp-lista-edit {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.imp-lista-edit li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.imp-lista-edit input {
+  flex: 1;
+  min-width: 8rem;
+  background: var(--tc-nero);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  padding: 0.5rem;
+  min-height: var(--tc-tocco-min);
+  color: var(--tc-crema);
+}
+
+.imp-check {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--tc-argento);
+}
+
+.imp-ordine {
+  width: 4rem !important;
+  flex: none !important;
+}
+
+.imp-aggiungi {
+  margin-top: 0.75rem;
+  color: var(--tc-blu);
+  text-decoration: underline;
+  min-height: auto;
+  padding: 0.5rem 0;
+}
+
+.imp-blocchi {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+
+.imp-blocco-riga {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--tc-argento-scuro);
+}
+
+.imp-backup-azioni {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.imp-backup-azioni button {
+  background: var(--tc-superficie);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 8px;
+  padding: 0.65rem 1.25rem;
+  min-width: auto;
+}
+
+.imp-conferma {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: var(--tc-nero);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.btn-pericolo {
+  color: var(--tc-rosso) !important;
+  border-color: var(--tc-rosso) !important;
+}
+
+.imp-min {
+  color: var(--tc-argento);
+}
+
+.imp-pericolo {
+  border-color: rgba(200, 50, 58, 0.35);
+}

@@ -1,0 +1,259 @@
+.agenda {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 1rem 1rem;
+  position: relative;
+}
+
+.agenda-chiuso .agenda-griglia-wrap {
+  opacity: 0.45;
+}
+
+.agenda-chiuso-msg {
+  text-align: center;
+  color: var(--tc-argento);
+  margin: 0.5rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.agenda-caricamento {
+  padding: 2rem;
+  color: var(--tc-argento);
+}
+
+.agenda-intestazione {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--tc-argento-scuro);
+  margin-bottom: 0.5rem;
+}
+
+.agenda-nav-data {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-freccia {
+  font-size: 1.25rem;
+  padding: 0.5rem;
+  color: var(--tc-crema);
+}
+
+.agenda-titolo {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  min-width: 12rem;
+  text-align: center;
+}
+
+.btn-oggi {
+  background: var(--tc-blu);
+  color: var(--tc-crema);
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 600;
+  min-width: auto;
+}
+
+.agenda-data-picker input {
+  background: var(--tc-superficie);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  padding: 0.5rem;
+  color: var(--tc-crema);
+  min-height: var(--tc-tocco-min);
+}
+
+.agenda-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--tc-argento);
+  margin-left: auto;
+}
+
+.agenda-toggle input {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.agenda-griglia-wrap {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: auto;
+}
+
+.agenda-ore {
+  flex-shrink: 0;
+  width: 3.5rem;
+  display: grid;
+  grid-template-rows: repeat(var(--slot-count), var(--tc-slot-h));
+  padding-top: 2.5rem;
+}
+
+.agenda-ora-label {
+  font-size: 0.75rem;
+  color: var(--tc-argento);
+  height: var(--tc-slot-h);
+  display: flex;
+  align-items: flex-start;
+  padding-top: 2px;
+}
+
+.agenda-colonne {
+  flex: 1;
+  display: flex;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.agenda-colonna {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.agenda-operatore-nome {
+  margin: 0;
+  text-align: center;
+  font-size: 1.1rem;
+  padding: 0.5rem;
+  background: var(--tc-superficie);
+  border-radius: 8px 8px 0 0;
+}
+
+.agenda-colonna-body {
+  position: relative;
+  display: grid;
+  grid-template-rows: repeat(var(--slot-count), var(--tc-slot-h));
+  background: var(--tc-superficie);
+  border: 1px solid var(--tc-argento-scuro);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+}
+
+.agenda-slot {
+  border: none;
+  border-bottom: 1px solid rgba(77, 77, 84, 0.4);
+  background: transparent;
+  min-height: var(--tc-slot-h);
+  width: 100%;
+  border-radius: 0;
+}
+
+.agenda-slot:hover {
+  background: rgba(56, 105, 147, 0.15);
+}
+
+.agenda-blocco-pausa {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(77, 77, 84, 0.35),
+    rgba(77, 77, 84, 0.35) 6px,
+    rgba(28, 27, 30, 0.9) 6px,
+    rgba(28, 27, 30, 0.9) 12px
+  );
+  color: var(--tc-argento);
+  font-size: 0.8rem;
+  padding: 0.25rem;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.app-blocco {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  z-index: 3;
+  background: var(--tc-blu);
+  color: var(--tc-crema);
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  overflow: hidden;
+  min-height: var(--tc-tocco-min);
+}
+
+.app-blocco.stato-provvisorio {
+  border: 2px dashed var(--tc-crema);
+  background: rgba(56, 105, 147, 0.6);
+}
+
+.app-blocco.stato-confermato {
+  border-left: 4px solid #5cb85c;
+}
+
+.app-blocco.stato-disdetto {
+  opacity: 0.45;
+  text-decoration: line-through;
+  background: var(--tc-argento-scuro);
+}
+
+.app-blocco-ora {
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
+
+.app-blocco-cliente {
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-blocco-servizio {
+  font-size: 0.8rem;
+  color: var(--tc-argento);
+}
+
+.app-blocco-spunta {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  color: #5cb85c;
+  font-weight: bold;
+}
+
+.app-blocco-breve {
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+  padding: 0.15rem 0.4rem;
+}
+
+.app-blocco-riga {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+.app-blocco-breve.stato-confermato .app-blocco-riga {
+  padding-right: 0.85rem;
+}
