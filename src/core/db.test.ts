@@ -335,6 +335,7 @@ describe('backup', () => {
       ...impDemo,
       nomeNegozio: 'Demo Modificata',
       ultimoBackupIl: '2026-11-01T10:00:00.000Z',
+      squadra: impostazioniNegozio.squadra,
     }
     await salvaImpostazioni(impConTutto)
 
@@ -455,6 +456,22 @@ describe('leggiImpostazioni frasi', () => {
     expect(imp.nomeNegozio).toBe('Salvato')
     expect(imp.frasi).toEqual(impostazioniNegozio.frasi)
     expect(imp.frasi?.mattina?.[0]).toContain('friend')
+  })
+})
+
+describe('leggiImpostazioni squadra', () => {
+  it('riempie squadra dal negozio se manca nelle impostazioni salvate', async () => {
+    const senzaSquadra: Impostazioni = {
+      ...impDemo,
+      nomeNegozio: 'Salvato squadra',
+    }
+    delete senzaSquadra.squadra
+    await salvaImpostazioni(senzaSquadra)
+
+    const imp = await leggiImpostazioni()
+    expect(imp.nomeNegozio).toBe('Salvato squadra')
+    expect(imp.squadra).toEqual(impostazioniNegozio.squadra)
+    expect(imp.squadra?.[1]?.frase).toBe('Travagghiati')
   })
 })
 

@@ -52,6 +52,8 @@ export function Layout({ voce, onNaviga, children }: Props) {
         badgePromemoria={badge}
         badgeDebiti={badgeDebiti}
         logo={logoUrl}
+        squadra={imp?.squadra}
+        assetBase={import.meta.env.BASE_URL}
       />
       <main className="app-main">
         {imp?.demoAttiva ? <DemoFascia /> : null}

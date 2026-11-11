@@ -1,6 +1,7 @@
 .sidebar {
   width: var(--tc-sidebar-w);
   flex-shrink: 0;
+  height: 100%;
   background: var(--tc-superficie);
   border-right: 1px solid var(--tc-argento-scuro);
   display: flex;
@@ -8,6 +9,7 @@
   align-items: center;
   padding: 1rem 0.5rem;
   gap: 1.5rem;
+  overflow: visible;
 }
 
 .sidebar-logo {
@@ -21,6 +23,8 @@
   margin: 0;
   padding: 0;
   width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .sidebar-voce {

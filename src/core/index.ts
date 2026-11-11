@@ -31,6 +31,7 @@ export type {
   HHMM,
   Impostazioni,
   ISODate,
+  MembroSquadra,
   MomentoFrase,
   Operatore,
   Riepilogo,
@@ -570,9 +571,12 @@ export async function totaleDaPagare(): Promise<TotaleDaPagare> {
 export async function leggiImpostazioni(): Promise<Impostazioni> {
   const row = await db.impostazioni.get('impostazioni')
   if (row) {
-    const valore = row.valore
+    let valore = row.valore
     if (valore.frasi === undefined && impostazioniDefault.frasi !== undefined) {
-      return { ...valore, frasi: impostazioniDefault.frasi }
+      valore = { ...valore, frasi: impostazioniDefault.frasi }
+    }
+    if (valore.squadra === undefined && impostazioniDefault.squadra !== undefined) {
+      valore = { ...valore, squadra: impostazioniDefault.squadra }
     }
     return valore
   }

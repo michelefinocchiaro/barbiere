@@ -40,4 +40,9 @@ Ci vediamo alle {ora}`,
       ...FRASI_PREDEFINITE.giornata_vuota,
     ],
   },
+  squadra: [
+    { nome: 'Giuseppe', immagine: 'brand/squadra/giuseppe.png', frase: 'Spacchi i Mattia' },
+    { nome: 'Alfio', immagine: 'brand/squadra/alfio.png', frase: 'Travagghiati' },
+    { nome: 'Mattia', immagine: 'brand/squadra/mattia.png', frase: 'Saddato' },
+  ],
 }

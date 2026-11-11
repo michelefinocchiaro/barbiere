@@ -1,0 +1,161 @@
+.sidebar-squadra {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.15rem;
+  width: 100%;
+  margin-top: auto;
+  padding: 0.75rem 0.25rem 0.5rem;
+  border-top: 1px solid var(--tc-argento-scuro);
+  flex-shrink: 0;
+}
+
+.sidebar-squadra-ritratto {
+  flex: 1;
+  max-width: 5.5rem;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: var(--tc-tocco-min);
+  line-height: 0;
+}
+
+.sidebar-squadra-img {
+  height: 88px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: bottom center;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  pointer-events: none;
+}
+
+.sidebar-squadra-ritratto.saltello .sidebar-squadra-img {
+  animation: squadra-salto 0.35s steps(2, end);
+}
+
+@keyframes squadra-salto {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.squadra-nuvoletta {
+  position: fixed;
+  z-index: 300;
+  pointer-events: none;
+  max-width: min(16rem, calc(100vw - 1rem));
+  padding: 0.45rem 0.65rem 0.55rem;
+  background: var(--tc-crema);
+  color: var(--tc-nero);
+  border: 2px solid var(--tc-nero);
+  box-shadow:
+    2px 0 0 0 var(--tc-nero),
+    0 2px 0 0 var(--tc-nero),
+    2px 2px 0 0 var(--tc-nero);
+  clip-path: polygon(
+    0 6px,
+    2px 6px,
+    2px 4px,
+    4px 4px,
+    4px 2px,
+    6px 2px,
+    6px 0,
+    calc(100% - 6px) 0,
+    calc(100% - 6px) 2px,
+    calc(100% - 4px) 2px,
+    calc(100% - 4px) 4px,
+    calc(100% - 2px) 4px,
+    calc(100% - 2px) 6px,
+    100% 6px,
+    100% calc(100% - 6px),
+    calc(100% - 2px) calc(100% - 6px),
+    calc(100% - 2px) calc(100% - 4px),
+    calc(100% - 4px) calc(100% - 4px),
+    calc(100% - 4px) calc(100% - 2px),
+    calc(100% - 6px) calc(100% - 2px),
+    calc(100% - 6px) 100%,
+    6px 100%,
+    6px calc(100% - 2px),
+    4px calc(100% - 2px),
+    4px calc(100% - 4px),
+    2px calc(100% - 4px),
+    2px calc(100% - 6px),
+    0 calc(100% - 6px)
+  );
+}
+
+.squadra-nuvoletta--centro {
+  transform: translate(-50%, -100%);
+}
+
+.squadra-nuvoletta--sinistra {
+  transform: translate(0, -100%);
+}
+
+.squadra-nuvoletta--destra {
+  transform: translate(-100%, -100%);
+}
+
+.squadra-nuvoletta-testo {
+  display: block;
+  font-family: 'Alfa Slab One', serif;
+  font-size: 0.85rem;
+  font-weight: 400;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.squadra-nuvoletta-coda {
+  position: absolute;
+  bottom: -10px;
+  width: 10px;
+  height: 10px;
+  background: var(--tc-crema);
+  border: 2px solid var(--tc-nero);
+  box-sizing: border-box;
+}
+
+.squadra-nuvoletta--centro .squadra-nuvoletta-coda {
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  border-top: none;
+  border-left: none;
+}
+
+.squadra-nuvoletta--sinistra .squadra-nuvoletta-coda {
+  left: 1.25rem;
+  transform: rotate(45deg);
+  border-top: none;
+  border-left: none;
+}
+
+.squadra-nuvoletta--destra .squadra-nuvoletta-coda {
+  right: 1.25rem;
+  left: auto;
+  transform: rotate(45deg);
+  border-top: none;
+  border-left: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-squadra-ritratto.saltello .sidebar-squadra-img {
+    animation: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .sidebar-squadra {
+    display: none;
+  }
+}

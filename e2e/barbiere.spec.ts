@@ -571,6 +571,132 @@ test.describe('Da pagare', () => {
   })
 })
 
+test.describe('barra del turno', () => {
+  async function apriAgendaOggi(page: import('@playwright/test').Page, quando: Date) {
+    await page.clock.setFixedTime(quando)
+    await page.goto('/')
+    await caricaDemoEApriAgenda(page)
+    await impostaDataAgenda(page, '2026-11-17')
+    await page.getByRole('button', { name: 'Oggi' }).click()
+    await expect(page.locator('.agenda input[type="date"]')).toHaveValue('2026-11-17')
+  }
+
+  async function rapportoRiempimentoBarra(page: import('@playwright/test').Page): Promise<number> {
+    return page.locator('.agenda-barra-turno-traccia').evaluate((traccia) => {
+      const pieno = traccia.querySelector('.agenda-barra-turno-pieno') as HTMLElement | null
+      if (!pieno) return 0
+      const tw = traccia.getBoundingClientRect().width
+      if (tw <= 0) return 0
+      return pieno.getBoundingClientRect().width / tw
+    })
+  }
+
+  test('martedì 17/11 alle 14:00 — barra ~50%, testo fine turno, niente linea ora', async ({ page }) => {
+    await apriAgendaOggi(page, new Date('2026-11-17T14:00:00+01:00'))
+    await expect(page.locator('.agenda-barra-turno')).toBeVisible()
+    await expect(page.locator('.agenda-barra-turno-testo')).toContainText('fine turno alle 20.00')
+    await expect(page.locator('.agenda-linea-ora')).toHaveCount(0)
+
+    const rapporto = await rapportoRiempimentoBarra(page)
+    expect(rapporto).toBeGreaterThanOrEqual(0.48)
+    expect(rapporto).toBeLessThanOrEqual(0.52)
+  })
+
+  test('mercoledì 18/11 — la barra non c\'è (non è oggi)', async ({ page }) => {
+    await apriAgendaOggi(page, new Date('2026-11-17T10:00:00+01:00'))
+    await impostaDataAgenda(page, '2026-11-18')
+    await expect(page.locator('.agenda-barra-turno')).toHaveCount(0)
+  })
+
+  test('martedì 7:30 — barra vuota, si apre alle 8.00', async ({ page }) => {
+    await apriAgendaOggi(page, new Date('2026-11-17T07:30:00+01:00'))
+    await expect(page.locator('.agenda-barra-turno-testo')).toHaveText('si apre alle 8.00')
+    expect(await rapportoRiempimentoBarra(page)).toBeLessThanOrEqual(0.02)
+  })
+
+  test('martedì 20:30 — barra piena, turno finito', async ({ page }) => {
+    await apriAgendaOggi(page, new Date('2026-11-17T20:30:00+01:00'))
+    await expect(page.locator('.agenda-barra-turno-testo')).toHaveText('turno finito')
+    expect(await rapportoRiempimentoBarra(page)).toBeGreaterThanOrEqual(0.98)
+  })
+
+  test('etichetta chiusura 20.00 allineata al fondo griglia, senza slot 20:00', async ({ page }) => {
+    await apriAgendaOggi(page, new Date('2026-11-17T14:00:00+01:00'))
+    const chiusura = page.locator('.agenda-ora-chiusura')
+    await expect(chiusura).toHaveText('20.00')
+    const scartoPx = await page.evaluate(() => {
+      const wrap = document.querySelector('.agenda-griglia-wrap') as HTMLElement | null
+      if (wrap) wrap.scrollTop = wrap.scrollHeight
+      const etichetta = document.querySelector('.agenda-ora-chiusura')
+      const corpo = document.querySelector('.agenda-colonna-body')
+      if (!etichetta || !corpo) return null
+      const rc = etichetta.getBoundingClientRect()
+      const rg = corpo.getBoundingClientRect()
+      return Math.abs(rc.top - rg.bottom)
+    })
+    expect(scartoPx).not.toBeNull()
+    expect(scartoPx!).toBeLessThanOrEqual(2)
+    await expect(page.getByRole('button', { name: /Nuovo appuntamento 20:00/i })).toHaveCount(0)
+  })
+})
+
+test.describe('squadra in sidebar', () => {
+  test('tablet — ritratti, nuvoletta e timeout', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'telefono-390', 'solo tablet')
+    await page.clock.install({ time: SABATO })
+    await page.goto('/')
+    await esciBenvenutoVuoto(page)
+
+    const giuseppe = page.getByRole('button', { name: 'Giuseppe' })
+    const alfio = page.getByRole('button', { name: 'Alfio' })
+    const mattia = page.getByRole('button', { name: 'Mattia' })
+    await expect(giuseppe).toBeVisible()
+    await expect(alfio).toBeVisible()
+    await expect(mattia).toBeVisible()
+
+    const [boxG, boxA, boxM] = await Promise.all([
+      giuseppe.boundingBox(),
+      alfio.boundingBox(),
+      mattia.boundingBox(),
+    ])
+    expect(boxG!.x).toBeLessThan(boxA!.x)
+    expect(boxA!.x).toBeLessThan(boxM!.x)
+
+    for (const btn of [giuseppe, alfio, mattia]) {
+      const w = await btn.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth)
+      expect(w).toBeGreaterThan(0)
+    }
+
+    await alfio.click()
+    const nuvoletta = page.locator('.squadra-nuvoletta')
+    await expect(nuvoletta).toHaveText('Travagghiati')
+    const vp = page.viewportSize()!
+    const bubble = await nuvoletta.boundingBox()
+    expect(bubble).not.toBeNull()
+    expect(bubble!.x).toBeGreaterThanOrEqual(0)
+    expect(bubble!.y).toBeGreaterThanOrEqual(0)
+    expect(bubble!.x + bubble!.width).toBeLessThanOrEqual(vp.width + 1)
+    expect(bubble!.y + bubble!.height).toBeLessThanOrEqual(vp.height + 1)
+
+    await mattia.click()
+    await expect(nuvoletta).toHaveText('Saddato')
+    await expect(page.getByRole('status')).not.toContainText('Travagghiati')
+
+    await page.clock.fastForward(3000)
+    await expect(nuvoletta).toHaveCount(0)
+  })
+
+  test('telefono 390 — nessun ritratto', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'telefono-390', 'solo telefono-390')
+    await page.clock.setFixedTime(SABATO)
+    await page.goto('/')
+    await esciBenvenutoVuoto(page)
+    await expect(page.getByRole('button', { name: 'Giuseppe' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Alfio' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Mattia' })).toHaveCount(0)
+  })
+})
+
 test.describe('screenshot collaterale', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     const ok = testInfo.project.name === 'tablet-1280' || testInfo.project.name === 'telefono-390'

@@ -158,6 +158,22 @@
     font-size: 0.75rem;
   }
 
+  .agenda-barra-turno {
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+  }
+
+  .agenda-barra-turno-testo {
+    font-size: 0.65rem;
+    max-width: 58%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .agenda-ora-chiusura {
+    font-size: 0.6rem;
+  }
+
   .sidebar-voce.attiva {
     background: transparent;
     color: var(--tc-crema);

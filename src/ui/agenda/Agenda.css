@@ -112,6 +112,36 @@
   color: var(--tc-argento);
 }
 
+.agenda-barra-turno {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+  min-width: 0;
+}
+
+.agenda-barra-turno-testo {
+  flex-shrink: 0;
+  font-size: var(--tc-fs-xs);
+  color: var(--tc-argento);
+  white-space: nowrap;
+}
+
+.agenda-barra-turno-traccia {
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  background: var(--tc-superficie);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.agenda-barra-turno-pieno {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
 .agenda-toggle-compatto {
   display: flex;
   align-items: center;
@@ -179,6 +209,18 @@
   display: grid;
   grid-template-rows: repeat(var(--slot-count), var(--tc-slot-h));
   padding-top: var(--agenda-testata-h);
+  position: relative;
+}
+
+.agenda-ora-chiusura {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--agenda-testata-h) + var(--slot-count) * var(--tc-slot-h));
+  font-size: 0.75rem;
+  color: var(--tc-argento);
+  line-height: 1;
+  padding-top: 0;
 }
 
 .agenda-ora-label {

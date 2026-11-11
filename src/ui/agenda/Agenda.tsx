@@ -150,17 +150,29 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
   const apreMin = imp ? minutiDaOra(imp.apre) : 0
   const passo = imp?.passoGrigliaMin ?? 15
 
-  const lineaOra = useMemo(() => {
+  const barraTurno = useMemo(() => {
     if (!imp || data !== oggiIso || chiuso) return null
     const now = minutiDaOra(oraCorrente)
-    const chiude = minutiDaOra(imp.chiude)
-    if (now < apreMin || now >= chiude) return null
-    const riga = (now - apreMin) / passo
-    return {
-      top: `calc(var(--agenda-testata-h) + ${riga} * var(--tc-slot-h))`,
-      label: formattaOra(oraCorrente),
+    const chiudeMin = minutiDaOra(imp.chiude)
+    const durata = chiudeMin - apreMin
+    if (durata <= 0) return null
+    if (now < apreMin) {
+      return {
+        fill: 0,
+        testo: `si apre alle ${formattaOra(imp.apre)}`,
+        ariaNow: 0,
+      }
     }
-  }, [imp, data, oggiIso, chiuso, oraCorrente, apreMin, passo])
+    if (now >= chiudeMin) {
+      return { fill: 1, testo: 'turno finito', ariaNow: 100 }
+    }
+    const fill = (now - apreMin) / durata
+    return {
+      fill,
+      testo: `${formattaOra(oraCorrente)} · fine turno alle ${formattaOra(imp.chiude)}`,
+      ariaNow: Math.round(fill * 100),
+    }
+  }, [imp, data, oggiIso, chiuso, oraCorrente, apreMin])
 
   const apriNuovo = useCallback((tap: SlotTap) => setPannello(tap), [])
   const apriModifica = useCallback((a: Appuntamento) => setPannello({ appuntamento: a }), [])
@@ -251,6 +263,20 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
         </label>
       </div>
       {contoServizi ? <p className="agenda-conto-servizi font-tabular">{contoServizi}</p> : null}
+      {barraTurno ? (
+        <div className="agenda-barra-turno">
+          <span className="agenda-barra-turno-testo font-tabular">{barraTurno.testo}</span>
+          <div
+            className="agenda-barra-turno-traccia"
+            role="progressbar"
+            aria-valuenow={barraTurno.ariaNow}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div className="agenda-barra-turno-pieno" style={{ width: `${barraTurno.fill * 100}%` }} />
+          </div>
+        </div>
+      ) : null}
     </header>
   )
 
@@ -284,18 +310,13 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
       {intestazione}
 
       <div className="agenda-griglia-wrap" ref={grigliaRef}>
-        {lineaOra ? (
-          <div className="agenda-linea-ora" style={{ top: lineaOra.top }} aria-hidden>
-            <span className="agenda-linea-ora-etichetta font-tabular">{lineaOra.label}</span>
-          </div>
-        ) : null}
-
         <div className="agenda-ore" style={{ '--slot-count': slotCount } as React.CSSProperties}>
           {slots.map((ora) => (
             <div key={ora} className="agenda-ora-label font-tabular">
               {formattaOra(ora)}
             </div>
           ))}
+          <div className="agenda-ora-chiusura font-tabular">{formattaOra(imp.chiude)}</div>
         </div>
         <div className="agenda-colonne">
           {operatoriAttivi.map((op) => (

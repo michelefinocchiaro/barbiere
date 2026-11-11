@@ -1,4 +1,6 @@
+import type { MembroSquadra } from '../../core'
 import './Sidebar.css'
+import { SquadraRitratti } from './SquadraRitratti'
 
 export type VoceNav = 'agenda' | 'promemoria' | 'clienti' | 'debiti' | 'impostazioni'
 
@@ -8,6 +10,8 @@ interface Props {
   badgePromemoria: number | undefined
   badgeDebiti: number | undefined
   logo: string
+  squadra?: MembroSquadra[]
+  assetBase: string
 }
 
 const VOCI: { id: VoceNav; etichetta: string }[] = [
@@ -57,7 +61,15 @@ function IconaVoce({ voce }: { voce: VoceNav }) {
   }
 }
 
-export function Sidebar({ attiva, onNaviga, badgePromemoria, badgeDebiti, logo }: Props) {
+export function Sidebar({
+  attiva,
+  onNaviga,
+  badgePromemoria,
+  badgeDebiti,
+  logo,
+  squadra,
+  assetBase,
+}: Props) {
   return (
     <nav className="sidebar" aria-label="Menu principale">
       {logo ? (
@@ -90,6 +102,7 @@ export function Sidebar({ attiva, onNaviga, badgePromemoria, badgeDebiti, logo }
           </li>
         ))}
       </ul>
+      {squadra?.length ? <SquadraRitratti membri={squadra} baseUrl={assetBase} /> : null}
     </nav>
   )
 }

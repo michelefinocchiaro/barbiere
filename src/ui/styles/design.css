@@ -59,30 +59,10 @@
   }
 }
 
-.agenda-linea-ora {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 3px;
+.agenda-barra-turno-pieno {
   background: var(--tc-palo);
   background-size: 20px 20px;
   animation: palo-scorre 8s linear infinite;
-  z-index: 5;
-  pointer-events: none;
-  display: flex;
-  align-items: center;
-}
-
-.agenda-linea-ora-etichetta {
-  position: absolute;
-  left: 0;
-  top: -1.1rem;
-  font-size: var(--tc-fs-xs);
-  font-variant-numeric: tabular-nums;
-  color: var(--tc-crema);
-  background: var(--tc-nero);
-  padding: 0 0.2rem;
-  font-weight: 600;
 }
 
 @keyframes palo-scorre {
@@ -136,8 +116,12 @@
 @media (prefers-reduced-motion: reduce) {
   .palo-verticale--ruota,
   .palo-verticale--festa,
-  .agenda-linea-ora,
+  .agenda-barra-turno-pieno,
   .prom-barra-fill {
     animation: none;
+  }
+
+  .agenda-barra-turno-pieno {
+    transition: none;
   }
 }

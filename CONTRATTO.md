@@ -93,7 +93,11 @@ export interface Impostazioni {
   ultimoBackupIl?: string;
   frasi?: Partial<Record<MomentoFrase, string[]>>;  // battute dell'app per chi sta al bancone; mancano = predefinite
   demoAttiva?: boolean;         // true dopo caricaDatiDemo, false dopo svuotaTutto/importaBackup
+  squadra?: MembroSquadra[];    // ritratti in fondo alla barra laterale (solo tablet e PC); mancano = niente ritratti
 }
+
+/** Un ritratto della squadra: toccandolo dice la sua frase in una nuvoletta. */
+export interface MembroSquadra { nome: string; immagine: string; frase: string }  // immagine relativa a public/, senza "/" iniziale
 
 /** Le battute che l'app mostra a chi sta al bancone. Mai nei messaggi ai clienti. */
 export type MomentoFrase =
@@ -249,7 +253,7 @@ giorniDallUltimoBackup(): Promise<number | null>
 caricaDatiDemo(): Promise<void>                       // SOLO dati inventati, vedi sotto; imposta demoAttiva = true
 svuotaTutto(): Promise<void>                          // demoAttiva = false
 ```
-`leggiImpostazioni`: se le impostazioni salvate non hanno `frasi`, le prende da `src/negozi/<negozio>.ts`
+`leggiImpostazioni`: se le impostazioni salvate non hanno `frasi` (o `squadra`), le prende da `src/negozi/<negozio>.ts`
 (così chi aveva già l'app riceve le battute nuove). `FRASI_PREDEFINITE` è esportato da `index.ts`.
 
 ## Un negozio: `src/negozi/<negozio>.ts`
