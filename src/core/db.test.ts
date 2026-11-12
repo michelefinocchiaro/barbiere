@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   appuntamentiDelGiorno,
   caricaDatiDemo,
+  cercaAppuntamenti,
   cercaClienti,
   db,
   debitiAperti,
@@ -197,6 +198,77 @@ async function clienteDemo(id: string, nome: string, telefono: string): Promise<
   await salvaCliente(c)
   return c
 }
+
+describe('cercaAppuntamenti', () => {
+  it('nome, telefono, ordine futuri/passati, disdetti, limite e query corta', async () => {
+    await salvaImpostazioni({
+      ...impDemo,
+      operatori: [
+        { id: op1, nome: 'Marco', attivo: true, ordine: 1 },
+        { id: op2, nome: 'Luca', attivo: true, ordine: 2 },
+      ],
+    })
+
+    const mario = await clienteDemo('c1', 'Nicolò Verdi', '393331234567')
+    await clienteDemo('c2', 'Luigi Bianchi', '393330000002')
+
+    const oggiStr = oggi()
+    const passato = '2020-06-01'
+    const futuroVicino = '2099-06-02'
+    const futuroDopo = '2099-06-03'
+
+    await salvaAppuntamento(
+      app({ clienteId: mario.id, data: passato, ora: '10:00', durataMin: 30, operatoreId: op1 }),
+    )
+    await salvaAppuntamento(
+      app({ clienteId: mario.id, data: futuroVicino, ora: '09:00', durataMin: 30, operatoreId: op1 }),
+    )
+    await salvaAppuntamento(
+      app({ clienteId: mario.id, data: futuroDopo, ora: '11:00', durataMin: 30, operatoreId: op2 }),
+    )
+    await salvaAppuntamento(
+      app({
+        clienteId: mario.id,
+        data: futuroVicino,
+        ora: '15:00',
+        durataMin: 30,
+        operatoreId: op1,
+        stato: 'disdetto',
+      }),
+    )
+    await salvaAppuntamento(
+      app({ clienteId: mario.id, data: oggiStr, ora: '12:00', durataMin: 30, operatoreId: op1 }),
+    )
+
+    expect(await cercaAppuntamenti('n')).toEqual([])
+    expect(await cercaAppuntamenti('')).toEqual([])
+
+    const perNome = await cercaAppuntamenti('nicolo')
+    expect(perNome.map((r) => `${r.appuntamento.data} ${r.appuntamento.ora}`)).toEqual([
+      `${oggiStr} 12:00`,
+      `${futuroVicino} 09:00`,
+      `${futuroVicino} 15:00`,
+      `${futuroDopo} 11:00`,
+      `${passato} 10:00`,
+    ])
+    expect(perNome.some((r) => r.appuntamento.stato === 'disdetto')).toBe(true)
+
+    const perAccento = await cercaAppuntamenti('NICOLÒ')
+    expect(perAccento.map((r) => r.cliente.nome)).toContain('Nicolò Verdi')
+
+    const perTel = await cercaAppuntamenti('4567')
+    expect(perTel.every((r) => r.cliente.id === mario.id)).toBe(true)
+
+    const rPassato = perNome.find((r) => r.appuntamento.data === passato)!
+    const rFuturo = perNome.find((r) => r.appuntamento.data === futuroVicino && r.appuntamento.ora === '09:00')!
+    expect(rPassato.futuro).toBe(false)
+    expect(rFuturo.futuro).toBe(true)
+
+    const limitati = await cercaAppuntamenti('nicolo', 2)
+    expect(limitati).toHaveLength(2)
+    expect(limitati.map((r) => r.appuntamento.ora)).toEqual(['12:00', '09:00'])
+  })
+})
 
 describe('righePromemoria', () => {
   beforeEach(async () => {

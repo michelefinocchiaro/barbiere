@@ -1,0 +1,82 @@
+.pannello-ricerca .ricerca-vuoto {
+  margin: 0.5rem 0 0;
+  color: var(--tc-argento);
+}
+
+.ricerca-gruppo {
+  margin-top: 0.75rem;
+}
+
+.ricerca-gruppo-titolo {
+  margin: 0 0 0.35rem;
+  font-size: var(--tc-fs-sm);
+  color: var(--tc-oro);
+  font-weight: 600;
+}
+
+.ricerca-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ricerca-riga {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--tc-argento-scuro);
+  background: var(--tc-nero);
+  min-height: var(--tc-tocco-min);
+}
+
+.ricerca-riga-quando {
+  font-size: var(--tc-fs-sm);
+  color: var(--tc-crema);
+}
+
+.ricerca-riga-cliente {
+  font-weight: 600;
+  color: var(--tc-crema);
+}
+
+.ricerca-riga-dettaglio {
+  font-size: var(--tc-fs-sm);
+  color: var(--tc-argento);
+}
+
+.ricerca-riga-stato {
+  font-size: var(--tc-fs-xs);
+  font-weight: 600;
+}
+
+.ricerca-riga.stato-disdetto {
+  border-color: var(--tc-argento);
+  opacity: 0.85;
+}
+
+.ricerca-riga.stato-provvisorio {
+  border-color: var(--tc-oro);
+}
+
+.ricerca-riga.stato-confermato {
+  border-color: #3d8f5a;
+}
+
+.ricerca-riga.stato-disdetto .ricerca-riga-stato {
+  color: var(--tc-argento);
+}
+
+.ricerca-riga.stato-provvisorio .ricerca-riga-stato {
+  color: var(--tc-oro);
+}
+
+.ricerca-riga.stato-confermato .ricerca-riga-stato {
+  color: #6ecf8f;
+}

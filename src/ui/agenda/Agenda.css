@@ -201,6 +201,7 @@
   min-height: 0;
   overflow: auto;
   position: relative;
+  scroll-padding-bottom: 5rem;
 }
 
 .agenda-ore {
@@ -412,4 +413,33 @@
 .agenda-vuota-overlay .btn-primario,
 .agenda-vista-centro .btn-primario {
   width: min(100%, 22rem);
+}
+
+.agenda-btn-cerca {
+  flex-shrink: 0;
+  min-height: var(--tc-tocco-min);
+  min-width: var(--tc-tocco-min);
+  padding: 0.35rem;
+  color: var(--tc-crema);
+  border-radius: 8px;
+}
+
+.agenda-btn-nuovo-testata {
+  display: none;
+  flex-shrink: 0;
+  background: var(--tc-rosso);
+  color: var(--tc-crema);
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  min-height: var(--tc-tocco-min);
+  white-space: nowrap;
+}
+
+.agenda-fab-nuovo {
+  display: none;
+}
+
+.agenda-con-pfab .agenda-griglia-wrap {
+  padding-bottom: 4.5rem;
 }

@@ -23,9 +23,11 @@ import {
   slotOrari,
 } from '../utils/dateUi'
 import { PannelloAppuntamento } from '../appuntamento/PannelloAppuntamento'
+import { PannelloRicerca } from './PannelloRicerca'
 import type { ToastAzione } from '../components/Toast'
 import { Caricamento } from '../components/Caricamento'
 import { IllustrazioneForbici } from '../components/IllustrazioneForbici'
+import { primoSlotLibero } from './primoSlotLibero'
 import './Agenda.css'
 
 interface SlotTap {
@@ -72,6 +74,8 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
   const [data, setData] = useState<ISODate>(() => dataIniziale ?? oggi())
   const [nascondiDisdetti, setNascondiDisdetti] = useState(true)
   const [pannello, setPannello] = useState<SlotTap | ModificaTap | null>(null)
+  const [ricercaAperta, setRicercaAperta] = useState(false)
+  const [scrollAppId, setScrollAppId] = useState<string | null>(null)
   const dataInputRef = useRef<HTMLInputElement>(null)
   const grigliaRef = useRef<HTMLDivElement>(null)
   const oraCorrente = useMinuto()
@@ -174,9 +178,35 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
     }
   }, [imp, data, oggiIso, chiuso, oraCorrente, apreMin])
 
-  const apriNuovo = useCallback((tap: SlotTap) => setPannello(tap), [])
+  const apriNuovo = useCallback((tap: SlotTap) => {
+    setRicercaAperta(false)
+    setPannello(tap)
+  }, [])
   const apriModifica = useCallback((a: Appuntamento) => setPannello({ appuntamento: a }), [])
   const chiudiPannello = useCallback(() => setPannello(null), [])
+
+  const apriNuovoAutomatico = useCallback(() => {
+    if (!imp) return
+    const { ora, operatoreId } = primoSlotLibero(
+      data,
+      imp,
+      appuntamenti ?? [],
+      blocchi ?? [],
+      operatoriAttivi,
+      oraCorrente,
+    )
+    if (operatoreId) apriNuovo({ data, ora, operatoreId })
+  }, [imp, data, appuntamenti, blocchi, operatoriAttivi, oraCorrente, apriNuovo])
+
+  const apriDaRicerca = useCallback(
+    (a: Appuntamento) => {
+      setRicercaAperta(false)
+      setData(a.data)
+      setScrollAppId(a.id)
+      setPannello({ appuntamento: a })
+    },
+    [],
+  )
 
   const vaiOggi = () => setData(oggiIso)
   const giornoPrima = () => setData((d) => aggiungiGiorni(d, -1))
@@ -218,6 +248,16 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
     wrap.scrollTop = Math.max(0, top - wrap.clientHeight / 3)
   }, [data, oggiIso, chiuso, imp, visibili, apreMin, passo, oraCorrente])
 
+  useEffect(() => {
+    if (!scrollAppId || !grigliaRef.current || !appuntamenti?.some((a) => a.id === scrollAppId)) return
+    const id = scrollAppId
+    requestAnimationFrame(() => {
+      const el = grigliaRef.current?.querySelector(`[data-app-id="${id}"]`)
+      el?.scrollIntoView({ block: 'center', behavior: 'auto' })
+      setScrollAppId(null)
+    })
+  }, [scrollAppId, appuntamenti, data])
+
   if (!imp) {
     return <Caricamento className="agenda-caricamento" />
   }
@@ -238,8 +278,22 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
         <button type="button" className="nav-freccia" onClick={giornoDopo} aria-label="Giorno successivo">
           <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
+        <button
+          type="button"
+          className="agenda-btn-cerca"
+          onClick={() => setRicercaAperta(true)}
+          aria-label="Cerca appuntamento"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="2.5" />
+            <path d="M20 20l-3.5-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+        </button>
         <button type="button" className="btn-oggi" onClick={vaiOggi}>
           Oggi
+        </button>
+        <button type="button" className="agenda-btn-nuovo-testata" onClick={apriNuovoAutomatico}>
+          + Nuovo
         </button>
       </div>
       <label className="agenda-data-picker">
@@ -295,6 +349,12 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
             Aggiungi comunque un appuntamento
           </button>
         </div>
+        {ricercaAperta ? (
+          <>
+            <div className="pannello-backdrop" role="presentation" onClick={() => setRicercaAperta(false)} />
+            <PannelloRicerca onChiudi={() => setRicercaAperta(false)} onScegli={apriDaRicerca} />
+          </>
+        ) : null}
         {pannello ? (
           <>
             <div className="pannello-backdrop" role="presentation" onClick={chiudiPannello} />
@@ -306,7 +366,7 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
   }
 
   return (
-    <div className="agenda">
+    <div className="agenda agenda-con-pfab">
       {intestazione}
 
       <div className="agenda-griglia-wrap" ref={grigliaRef}>
@@ -350,6 +410,16 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
         ) : null}
       </div>
 
+      <button type="button" className="agenda-fab-nuovo" onClick={apriNuovoAutomatico} aria-label="Nuovo appuntamento">
+        +
+      </button>
+
+      {ricercaAperta ? (
+        <>
+          <div className="pannello-backdrop" role="presentation" onClick={() => setRicercaAperta(false)} />
+          <PannelloRicerca onChiudi={() => setRicercaAperta(false)} onScegli={apriDaRicerca} />
+        </>
+      ) : null}
       {pannello ? (
         <>
           <div className="pannello-backdrop" role="presentation" onClick={chiudiPannello} />
@@ -429,6 +499,7 @@ function ColonnaOperatore({
             <button
               key={a.id}
               type="button"
+              data-app-id={a.id}
               className={`app-blocco stato-${stato}${inAttesa ? ' in-attesa' : ''}${breve ? ' app-blocco-breve' : ''}`}
               style={{
                 top: `${top}%`,

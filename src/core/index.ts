@@ -15,6 +15,7 @@ import type {
   Riepilogo,
   RigaDebito,
   RigaPromemoria,
+  RisultatoRicerca,
   StatoAppuntamento,
   TotaleDaPagare,
 } from './tipi.ts'
@@ -37,6 +38,7 @@ export type {
   Riepilogo,
   RigaDebito,
   RigaPromemoria,
+  RisultatoRicerca,
   Servizio,
   StatoAppuntamento,
   TipoAvviso,
@@ -410,6 +412,49 @@ export async function impostaStato(id: string, stato: StatoAppuntamento): Promis
 
 export async function eliminaAppuntamento(id: string): Promise<void> {
   await db.appuntamenti.delete(id)
+}
+
+export async function cercaAppuntamenti(query: string, limite?: number): Promise<RisultatoRicerca[]> {
+  const q = query.trim()
+  if (q.length < 2) return []
+
+  const qNorm = normalizzaRicerca(q)
+  const cifre = qNorm.replace(/\D/g, '')
+
+  const clienti = await db.clienti.toArray()
+  const clientiMatch = clienti.filter((c) => {
+    if (normalizzaRicerca(c.nome).includes(qNorm)) return true
+    if (cifre.length > 0 && c.telefono.endsWith(cifre)) return true
+    return false
+  })
+  if (clientiMatch.length === 0) return []
+
+  const ids = new Set(clientiMatch.map((c) => c.id))
+  const clientiMap = new Map(clientiMatch.map((c) => [c.id, c]))
+
+  const imp = await leggiImpostazioni()
+  const operatoriMap = new Map(imp.operatori.map((o) => [o.id, o]))
+  const serviziMap = new Map(imp.servizi.map((s) => [s.id, s]))
+
+  const apps = await db.appuntamenti.filter((a) => ids.has(a.clienteId)).toArray()
+  const oggiStr = oggi()
+
+  const risultati: RisultatoRicerca[] = apps.map((a) => ({
+    appuntamento: a,
+    cliente: clientiMap.get(a.clienteId)!,
+    operatore: operatoriMap.get(a.operatoreId),
+    servizio: a.servizioId ? serviziMap.get(a.servizioId) : undefined,
+    futuro: a.data >= oggiStr,
+  }))
+
+  const futuri = risultati
+    .filter((r) => r.futuro)
+    .sort((a, b) => `${a.appuntamento.data}T${a.appuntamento.ora}`.localeCompare(`${b.appuntamento.data}T${b.appuntamento.ora}`))
+  const passati = risultati
+    .filter((r) => !r.futuro)
+    .sort((a, b) => `${b.appuntamento.data}T${b.appuntamento.ora}`.localeCompare(`${a.appuntamento.data}T${a.appuntamento.ora}`))
+
+  return [...futuri, ...passati].slice(0, limite ?? 30)
 }
 
 export async function blocchiDelGiorno(data: ISODate): Promise<Blocco[]> {

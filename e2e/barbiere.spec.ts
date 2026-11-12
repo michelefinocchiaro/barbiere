@@ -640,6 +640,81 @@ test.describe('barra del turno', () => {
   })
 })
 
+test.describe('nuovo appuntamento e ricerca', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.clock.setFixedTime(SABATO)
+    await page.goto('/')
+    await caricaDemoEApriAgenda(page)
+    await impostaDataAgenda(page, '2026-11-17')
+  })
+
+  test('+ Nuovo apre il primo slot libero, salva e compare in griglia', async ({ page }, testInfo) => {
+    const isPhone = testInfo.project.name === 'telefono-390'
+    if (isPhone) {
+      await page.locator('.agenda-fab-nuovo').click()
+    } else {
+      await page.locator('.agenda-btn-nuovo-testata').click()
+    }
+    await expect(page.getByRole('heading', { name: 'Nuovo appuntamento' })).toBeVisible()
+    await expect(page.locator('.avvisi-fascia')).toHaveCount(0)
+    const oraValue = await page.locator('.pannello-corpo input[type="time"]').inputValue()
+    expect(oraValue).toBe('08:00')
+
+    const nomeCliente = 'Cliente E2E Nuovo'
+    const campoCliente = page.getByPlaceholder('Nome o ultime cifre del telefono')
+    await campoCliente.fill('99100')
+    await page.locator('.link-nuovo').click()
+    await page.getByLabel('Nome').fill(nomeCliente)
+    await page.getByLabel('Telefono').fill('333 000 0100')
+    await page.getByRole('button', { name: 'Aggiungi cliente' }).click()
+    await page.getByRole('button', { name: 'Salva' }).click()
+    await expect(page.getByRole('heading', { name: 'Nuovo appuntamento' })).toHaveCount(0)
+    await expect(page.locator('.app-blocco').filter({ hasText: nomeCliente })).toBeVisible()
+    const etichettaOra = oraValue.replace(':', '.').replace(/^0/, '')
+    await expect(
+      page.locator('.app-blocco').filter({ hasText: nomeCliente }).filter({ hasText: etichettaOra }),
+    ).toBeVisible()
+  })
+
+  test('telefono — il pulsante + sta sopra la barra di navigazione', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'telefono-390', 'solo telefono-390')
+    const fab = page.getByRole('button', { name: 'Nuovo appuntamento', exact: true })
+    const nav = page.getByRole('navigation', { name: 'Menu principale' })
+    const fabBox = await fab.boundingBox()
+    const navBox = await nav.boundingBox()
+    expect(fabBox).not.toBeNull()
+    expect(navBox).not.toBeNull()
+    expect(fabBox!.y + fabBox!.height).toBeLessThanOrEqual(navBox!.y + 1)
+  })
+
+  test('ricerca per nome, telefono e risultato vuoto', async ({ page }) => {
+    await page.getByRole('button', { name: 'Cerca appuntamento' }).click()
+    const campo = page.getByPlaceholder('Nome o ultime cifre del telefono')
+    await campo.fill('mar')
+    await expect(page.getByRole('heading', { name: 'Prossimi', level: 3 })).toBeVisible()
+    await expect(page.locator('.ricerca-riga').filter({ hasText: 'Mario Rossi' }).first()).toBeVisible()
+
+    await campo.fill('0002')
+    await expect(page.locator('.ricerca-riga').filter({ hasText: 'Luigi Bianchi' }).first()).toBeVisible()
+
+    await campo.fill('mar')
+    await page
+      .locator('.ricerca-riga')
+      .filter({ hasText: '9.00' })
+      .filter({ hasText: 'Mario Rossi' })
+      .first()
+      .click()
+    await expect(page.locator('.agenda-titolo')).toContainText('17 novembre')
+    await expect(page.getByRole('heading', { name: 'Modifica appuntamento' })).toBeVisible()
+    await expect(page.getByPlaceholder('Nome o ultime cifre del telefono')).toHaveValue('Mario Rossi')
+
+    await page.getByRole('button', { name: 'Chiudi' }).click()
+    await page.getByRole('button', { name: 'Cerca appuntamento' }).click()
+    await campo.fill('zzz')
+    await expect(page.getByText('Nessun appuntamento per "zzz"')).toBeVisible()
+  })
+})
+
 test.describe('squadra in sidebar', () => {
   test('tablet — ritratti, nuvoletta e timeout', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'telefono-390', 'solo tablet')

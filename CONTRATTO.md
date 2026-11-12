@@ -141,6 +141,12 @@ export interface Debito {
 export interface RigaDebito { debito: Debito; cliente: Cliente }
 
 export interface TotaleDaPagare { totaleCent: number; clienti: number; voci: number }
+
+/** Un risultato della ricerca appuntamenti, già pronto da mostrare. */
+export interface RisultatoRicerca {
+  appuntamento: Appuntamento; cliente: Cliente; operatore?: Operatore; servizio?: Servizio;
+  futuro: boolean;              // data >= oggi
+}
 ```
 
 ## Funzioni (`src/core/index.ts`)
@@ -209,6 +215,10 @@ spostaAppuntamento(id: string, data: ISODate, ora: HHMM, operatoreId: string):
   Promise<{ appuntamento: Appuntamento; avvisi: Avviso[] }>     // se cambia il giorno, promemoria torna "da_inviare"
 impostaStato(id: string, stato: StatoAppuntamento): Promise<void>
 eliminaAppuntamento(id: string): Promise<void>                  // per gli errori di battitura; disdire è impostaStato
+cercaAppuntamenti(query: string, limite?: number): Promise<RisultatoRicerca[]>
+  // stesso criterio di cercaClienti (nome senza maiuscole/accenti, o cifre del telefono);
+  // prima i futuri (data >= oggi) dal più vicino, poi i passati dal più recente; disdetti inclusi;
+  // query vuota o di 1 carattere → []; limite predefinito 30
 blocchiDelGiorno(data: ISODate): Promise<Blocco[]>
 salvaBlocco(b: Omit<Blocco,"id"> & { id?: string }): Promise<Blocco>
 eliminaBlocco(id: string): Promise<void>

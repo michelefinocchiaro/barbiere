@@ -98,3 +98,9 @@ export interface Debito {
 export interface RigaDebito { debito: Debito; cliente: Cliente }
 
 export interface TotaleDaPagare { totaleCent: number; clienti: number; voci: number }
+
+/** Un risultato della ricerca appuntamenti, già pronto da mostrare. */
+export interface RisultatoRicerca {
+  appuntamento: Appuntamento; cliente: Cliente; operatore?: Operatore; servizio?: Servizio;
+  futuro: boolean;              // data >= oggi
+}
