@@ -64,6 +64,7 @@ function controlla() {
     try { await p.getByRole('button', { name: /dati demo|esempio/i }).first().click({ timeout: 2000 });
           await p.getByRole('button', { name: /^(Sì|Si|Conferma|Carica)/ }).first().click({ timeout: 2000 }); await p.waitForTimeout(500); } catch {}
     await passo('agenda', async () => { await vai('Agenda'); if (!(await p.getByText('Mario Rossi').first().isVisible().catch(() => false))) { await p.getByRole('button', { name: /▶|successivo|avanti/i }).first().click(); await p.waitForTimeout(300); } });
+    await passo('agenda-settimana', async () => { await vai('Agenda'); await p.getByRole('button', { name: 'Settimana', exact: true }).click(); await p.waitForTimeout(400); });
     await passo('pannello', async () => { await p.getByText('Mario Rossi').first().click({ timeout: 3000 }); await p.waitForTimeout(400); });
     try { await p.keyboard.press('Escape'); await p.getByRole('button', { name: /^(Chiudi|Annulla|✕|×)/ }).first().click({ timeout: 1500 }); } catch {}
     await p.waitForTimeout(300);

@@ -27,13 +27,31 @@ export interface Appuntamento {
   stato: StatoAppuntamento;
   promemoria: EsitoPromemoria;
   testoPromemoria?: string;     // testo ritoccato a mano per questo cliente; assente = testo standard
+  serieId?: string;             // uguale per tutti gli appuntamenti nati dalla stessa serie
   creatoIl: string; aggiornatoIl: string;
 }
+
+export interface RegolaSerie {
+  ogni: number;                   // >= 1
+  unita: "giorni" | "settimane" | "mesi";
+  volte?: number;                 // quante in tutto, la prima compresa
+  finoA?: ISODate;                // oppure fino a questa data compresa. Uno dei due è obbligatorio
+}
+
+export interface VoceSerie { data: ISODate; ora: HHMM; avvisi: Avviso[] }
 
 /** Pausa, assenza o chiusura. operatoreId null = tutto il negozio. dalle/alle assenti = giornata intera. */
 export interface Blocco {
   id: string; operatoreId: string | null; data: ISODate;
   dalle?: HHMM; alle?: HHMM; motivo?: string;
+  tipo?: "assenza" | "impegno";   // assenza = default; impegno = evento extra, motivo è il titolo
+}
+
+/** Un messaggio WhatsApp già pronto, da mandare con un tocco dal pannello dell'appuntamento. */
+export interface MessaggioRapido {
+  id: string; etichetta: string;   // "Sii puntuale", "Ritarda 10 min"
+  testo: string;                   // segnaposto {nome} {ora} {ora_dopo} {quando}
+  ritardoMin?: number;             // se c'è, {ora_dopo} = ora + ritardoMin
 }
 
 export interface Impostazioni {
@@ -50,6 +68,8 @@ export interface Impostazioni {
   frasi?: Partial<Record<MomentoFrase, string[]>>;  // battute dell'app per chi sta al bancone; mancano = predefinite
   demoAttiva?: boolean;         // true dopo caricaDatiDemo, false dopo svuotaTutto/importaBackup
   squadra?: MembroSquadra[];    // ritratti in fondo alla barra laterale (solo tablet e PC); mancano = niente ritratti
+  messaggiRapidi?: MessaggioRapido[];  // mancano = quelli di src/negozi/<negozio>.ts (come `frasi`)
+  testoRiepilogo?: string;             // segnaposto {elenco}; manca = quello del negozio
 }
 
 /** Un ritratto della squadra: toccandolo dice la sua frase in una nuvoletta. */
@@ -103,4 +123,9 @@ export interface TotaleDaPagare { totaleCent: number; clienti: number; voci: num
 export interface RisultatoRicerca {
   appuntamento: Appuntamento; cliente: Cliente; operatore?: Operatore; servizio?: Servizio;
   futuro: boolean;              // data >= oggi
+}
+
+export interface RiepilogoCliente {
+  cliente: Cliente; appuntamenti: Appuntamento[];   // futuri non disdetti, dal più vicino
+  testo: string; link: string;
 }

@@ -258,7 +258,10 @@ test.describe('flusso tablet agenda', () => {
   test('giorno chiuso — lunedì 16/11', async ({ page }) => {
     await impostaDataAgenda(page, '2026-11-16')
     await expect(page.getByText('Chiuso')).toBeVisible()
-    await page.getByRole('button', { name: /Aggiungi comunque un appuntamento/i }).click()
+    await expect(page.locator('.agenda-griglia-wrap')).toBeVisible()
+    const testata = page.getByRole('button', { name: '+ Nuovo' })
+    if ((await testata.count()) > 0) await testata.click()
+    else await page.locator('.agenda-fab-nuovo').click()
     await expect(page.getByRole('dialog')).toBeVisible()
   })
 })
@@ -287,7 +290,7 @@ test.describe('agenda dati demo', () => {
   test('martedì 17/11 — blocchi demo visibili e allineati alla griglia', async ({ page }) => {
     await impostaDataAgenda(page, '2026-11-17')
     const blocchi = page.locator('.app-blocco')
-    await expect(blocchi).toHaveCount(5)
+    await expect(blocchi).toHaveCount(6)
 
     await verificaTestateOperatori(page)
     await verificaBlocchiConEtichetteOra(page)
@@ -337,7 +340,7 @@ test.describe('telefono 390', () => {
 
   test('martedì in agenda — entrambi gli operatori e tutti i blocchi visibili', async ({ page }) => {
     await impostaDataAgenda(page, '2026-11-17')
-    await expect(page.locator('.app-blocco')).toHaveCount(5)
+    await expect(page.locator('.app-blocco')).toHaveCount(6)
     await verificaTestateOperatori(page)
     await verificaBlocchiConEtichetteOra(page)
     for (const nome of negozioDefault.operatori.filter((o) => o.attivo).map((o) => o.nome)) {
@@ -431,7 +434,8 @@ test.describe('design benvenuto e battute', () => {
     await expect(page.locator('.agenda-titolo')).toBeVisible({ timeout: 20_000 })
     await impostaDataAgenda(page, '2026-11-16')
     await expect(page.getByText('Chiuso')).toBeVisible()
-    await expect(page.locator('.agenda-frase-momento')).toBeVisible()
+    await expect(page.locator('.agenda-fascia-chiuso .agenda-frase-momento')).toBeVisible()
+    await expect(page.locator('.agenda-griglia-wrap')).toBeVisible()
   })
 
   test('testata agenda con frase del negozio', async ({ page }) => {
@@ -520,6 +524,21 @@ test.describe('Da pagare', () => {
     await modulo2.getByRole('button', { name: 'Salva da pagare', exact: true }).click()
     await expect(modulo2.getByRole('alert')).toContainText(/importo/i)
     await expect(modulo2).toBeVisible()
+  })
+
+  test('un importo sopra i mille euro si riapre e si salva', async ({ page }) => {
+    await page.getByRole('button', { name: /^Da pagare/ }).click()
+    await page.getByRole('button', { name: '+ Segna da pagare' }).click()
+    const modulo = page.locator('.modulo-debito')
+    await modulo.getByPlaceholder('Nome o ultime cifre del telefono').fill('Luigi')
+    await modulo.locator('.suggerimenti button').first().click()
+    await modulo.locator('input[placeholder="es. 15 o 12,50"]').fill('1250')
+    await modulo.getByRole('button', { name: 'Salva da pagare', exact: true }).click()
+    await page.locator('.debiti-riga-tap').filter({ hasText: '1.250,00 €' }).click()
+    const dialog = page.locator('.debiti-modifica')
+    await dialog.locator('.btn-primario').click()
+    await expect(page.locator('.toast').filter({ hasText: 'Modifica salvata' })).toBeVisible()
+    await expect(page.locator('.debiti-riga-tap').filter({ hasText: '1.250,00 €' })).toBeVisible()
   })
 
   test('dal pannello appuntamento apre il modulo col cliente scelto', async ({ page }) => {
@@ -715,6 +734,40 @@ test.describe('nuovo appuntamento e ricerca', () => {
   })
 })
 
+test.describe('giro 1A — scambio, messaggi, riepilogo', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.clock.setFixedTime(SABATO)
+    await page.goto('/')
+    await caricaDemoEApriAgenda(page)
+  })
+
+  test('scambia due appuntamenti', async ({ page }) => {
+    await page.locator('.app-blocco').filter({ hasText: 'Mario Rossi' }).first().click()
+    await page.getByRole('button', { name: 'Scambia con…' }).click()
+    await expect(page.getByText(/Tocca l.appuntamento con cui scambiare/)).toBeVisible()
+    await page.locator('.app-blocco').filter({ hasText: 'Luigi Bianchi' }).first().click()
+    await expect(page.getByRole('heading', { name: 'Confermi lo scambio?' })).toBeVisible()
+    await page.locator('.agenda-scambio-conferma').getByRole('button', { name: 'Scambia' }).click()
+    await expect(page.locator('.agenda-scambio-fascia')).toHaveCount(0)
+    await expect(page.locator('.toast')).toContainText('Scambiati')
+  })
+
+  test('messaggio rapido con link WhatsApp', async ({ page }) => {
+    await page.locator('.app-blocco').filter({ hasText: 'Mario Rossi' }).first().click()
+    const link = page.getByRole('link', { name: 'Sii puntuale' })
+    await expect(link).toHaveAttribute('href', /api\.whatsapp\.com/)
+    await expect(link).toHaveAttribute('href', /phone=393330000001/)
+  })
+
+  test('riepilogo per cliente con due appuntamenti', async ({ page }) => {
+    await page.locator('.app-blocco').filter({ hasText: 'Mario Rossi' }).first().click()
+    await page.getByRole('button', { name: /Invia riepilogo \(2 appuntamenti\)/ }).click()
+    await expect(page.locator('.invia-riepilogo-anteprima')).toBeVisible()
+    const wa = page.getByRole('link', { name: 'Apri WhatsApp' })
+    await expect(wa).toHaveAttribute('href', /api\.whatsapp\.com/)
+  })
+})
+
 test.describe('squadra in sidebar', () => {
   test('tablet — ritratti, nuvoletta e timeout', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'telefono-390', 'solo tablet')
@@ -769,6 +822,202 @@ test.describe('squadra in sidebar', () => {
     await expect(page.getByRole('button', { name: 'Giuseppe' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Alfio' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Mattia' })).toHaveCount(0)
+  })
+})
+
+test.describe('giro 1B — settimana e impegni', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.clock.setFixedTime(SABATO)
+    await page.goto('/')
+    await caricaDemoEApriAgenda(page)
+  })
+
+  test('cambio vista settimana', async ({ page }) => {
+    await impostaDataAgenda(page, '2026-11-17')
+    await page.getByRole('button', { name: 'Settimana', exact: true }).click()
+    await expect(page.locator('.agenda-settimana')).toBeVisible()
+    await expect(page.getByText('Corso fornitori')).toBeVisible()
+    await page.getByRole('button', { name: 'Giorno', exact: true }).click()
+    await expect(page.locator('.agenda-griglia-wrap')).toBeVisible()
+  })
+
+  test('impegno su lunedì creato e visibile', async ({ page }) => {
+    await impostaDataAgenda(page, '2026-11-17')
+    await page.getByRole('button', { name: 'Settimana', exact: true }).click()
+    const lundiHeader = page.locator('.agenda-sett-col').filter({ hasText: /lunedì/i })
+    await lundiHeader.getByRole('button', { name: 'Aggiungi' }).click()
+    await lundiHeader.getByRole('menuitem', { name: 'Impegno' }).click()
+    await expect(page.getByRole('heading', { name: 'Nuovo impegno' })).toBeVisible()
+    await page.getByLabel('Titolo').fill('Taglio a domicilio')
+    await page.locator('.pannello-impegno').getByRole('button', { name: 'Salva' }).click()
+    await expect(lundiHeader.getByText('Taglio a domicilio')).toBeVisible()
+    await lundiHeader.getByRole('button', { name: /lunedì/i }).click()
+    await expect(page.locator('.agenda-impegni-giorno').getByText('Taglio a domicilio')).toBeVisible()
+  })
+
+  test('appuntamento lunedì con solo avviso giorno chiuso', async ({ page }) => {
+    await impostaDataAgenda(page, '2026-11-16')
+    const testata = page.getByRole('button', { name: '+ Nuovo' })
+    if ((await testata.count()) > 0) await testata.click()
+    else await page.locator('.agenda-fab-nuovo').click()
+    await page.getByPlaceholder('Nome o ultime cifre del telefono').fill('Cliente Demo')
+    await page.getByRole('button', { name: 'Cliente nuovo' }).click()
+    await page.getByLabel('Nome').fill('Cliente Demo')
+    await page.getByLabel('Telefono').fill('333 000 0111')
+    await page.getByRole('button', { name: 'Aggiungi cliente' }).click()
+    await page.getByRole('button', { name: 'Taglio 30 min' }).click()
+    await page.getByRole('button', { name: 'Salva', exact: true }).click()
+    await expect(page.getByRole('alert')).toContainText(/chiuso/i)
+    await page.getByRole('button', { name: 'Salva comunque' }).click()
+    await expect(page.getByText('Cliente Demo').first()).toBeVisible()
+  })
+
+  test('annulla eliminazione impegno', async ({ page }) => {
+    await impostaDataAgenda(page, '2026-11-17')
+    await page.getByRole('button', { name: 'Settimana', exact: true }).click()
+    await page.getByText('Corso fornitori').click()
+    await page.getByRole('button', { name: 'Elimina' }).click()
+    await page.getByRole('button', { name: 'Conferma elimina' }).click()
+    await expect(page.getByText('Corso fornitori')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Annulla' }).last().click()
+    await expect(page.getByText('Corso fornitori')).toBeVisible()
+  })
+})
+
+test.describe('giro 2 — pc 1440×900', () => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'pc-1440', 'solo pc-1440')
+    await page.clock.setFixedTime(SABATO)
+    await page.goto('/')
+    await esciBenvenutoVuoto(page)
+    await page.getByRole('button', { name: 'Impostazioni' }).click()
+    await page.getByRole('button', { name: 'Carica dati demo' }).click()
+    await page.getByRole('button', { name: 'Sì' }).click()
+    await page.getByRole('button', { name: 'Agenda' }).click()
+    await expect(page.locator('.agenda-titolo')).toBeVisible()
+  })
+
+  test('testata agenda con Giorno, Settimana e + Nuovo visibili in entrambe le viste', async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'Settimana', exact: true })).toBeVisible()
+    await expect(page.locator('.agenda-btn-nuovo-testata')).toBeVisible()
+    await page.getByRole('button', { name: 'Settimana', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Giorno', exact: true })).toBeVisible()
+    await expect(page.locator('.agenda-btn-nuovo-testata')).toBeVisible()
+    const toggle = page.locator('.agenda-vista-toggle')
+    const box = await toggle.boundingBox()
+    expect(box!.width).toBeGreaterThan(120)
+    expect(box!.height).toBeGreaterThan(30)
+  })
+
+  test('saluto senza cifre di conteggio appuntamenti', async ({ page }) => {
+    const battuta = page.locator('.agenda-battuta')
+  await expect(battuta).toBeVisible()
+    const testo = (await battuta.textContent()) ?? ''
+    expect(testo).not.toMatch(/\d+/)
+  })
+
+  test('crea serie con una riga esclusa e una ritoccata', async ({ page }) => {
+    await page.getByRole('button', { name: '+ Nuovo' }).click()
+    await page.getByPlaceholder('Nome o ultime cifre del telefono').fill('Serie Nuova')
+    await page.getByRole('button', { name: 'Cliente nuovo' }).click()
+    await page.getByLabel('Nome').fill('Serie Nuova')
+    await page.getByLabel('Telefono').fill('333 000 0777')
+    await page.getByRole('button', { name: 'Aggiungi cliente' }).click()
+    await page.getByRole('button', { name: 'Ripeti…' }).click()
+    await page.getByRole('button', { name: 'Ogni 2 sett.' }).click()
+    const righe = page.locator('.modulo-ripeti-lista li')
+    await expect(righe).not.toHaveCount(0)
+    await righe.nth(1).locator('.modulo-ripeti-escludi input').uncheck()
+    await righe.nth(2).locator('.modulo-ripeti-data input').fill('2026-11-25')
+    await righe.nth(2).locator('.modulo-ripeti-ora input').fill('10:30')
+    const crea = page.getByRole('button', { name: /Crea \d+ appuntament/ })
+    const label = (await crea.textContent()) ?? ''
+    const n = parseInt(label.match(/\d+/)?.[0] ?? '0', 10)
+    expect(n).toBeGreaterThanOrEqual(2)
+    await crea.click()
+    await page.getByRole('button', { name: 'Annulla' }).last().click()
+    await expect(page.getByText('Serie Nuova')).toHaveCount(0)
+  })
+
+  test('pannello modifica: azioni visibili senza scroll a 1440×900', async ({ page }) => {
+    await impostaDataAgenda(page, '2026-11-17')
+    await page.locator('.app-blocco-serie').first().click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    const corpo = page.locator('.pannello-corpo')
+    await corpo.evaluate((el) => {
+      el.scrollTop = 0
+    })
+    const vh = page.viewportSize()!.height
+    const dentroSchermo = async (loc: import('@playwright/test').Locator) => {
+      await expect(loc).toBeVisible()
+      const box = await loc.boundingBox()
+      expect(box).not.toBeNull()
+      expect(box!.y).toBeGreaterThanOrEqual(-1)
+      expect(box!.y + box!.height).toBeLessThanOrEqual(vh + 1)
+    }
+    await dentroSchermo(page.getByRole('button', { name: 'Ripeti…' }))
+    await dentroSchermo(page.getByText(/Appuntamento fisso · \d+ di \d+/))
+    await dentroSchermo(page.locator('.messaggi-rapidi .btn-messaggio-rapido').first())
+    await dentroSchermo(page.getByRole('button', { name: /Invia riepilogo/ }))
+    await dentroSchermo(page.getByRole('button', { name: 'Scambia con…' }))
+    await dentroSchermo(page.getByRole('button', { name: 'Sposta', exact: true }))
+    await dentroSchermo(page.getByRole('button', { name: 'Elimina', exact: true }))
+  })
+
+  test('anteprima ripeti: righe sotto 64 px e almeno 6 visibili con 8 date', async ({ page }) => {
+    await impostaDataAgenda(page, '2026-11-17')
+    await page.getByText('Mario Rossi').first().click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Ripeti…' }).click()
+    await page.getByRole('button', { name: 'Ogni 2 sett.' }).click()
+    const lista = page.getByRole('dialog').locator('.modulo-ripeti .modulo-ripeti-lista')
+    await expect(lista).toBeVisible()
+    const righe = lista.locator('> li')
+    await expect(righe).toHaveCount(8, { timeout: 10_000 })
+    const corpo = page.locator('.pannello-corpo')
+    await corpo.evaluate((el) => {
+      el.scrollTop = 0
+    })
+    lista.evaluate((el) => {
+      el.scrollTop = 0
+    })
+    const listaBox = await lista.boundingBox()
+    expect(listaBox).not.toBeNull()
+    let visibili = 0
+    const n = await righe.count()
+    for (let i = 0; i < n; i++) {
+      const riga = righe.nth(i).locator('.modulo-ripeti-riga')
+      const box = await riga.boundingBox()
+      const boxLi = await righe.nth(i).boundingBox()
+      if (!box || !boxLi || !listaBox) continue
+      expect(box.height).toBeLessThan(64)
+      if (boxLi.y >= listaBox.y - 1 && boxLi.y + boxLi.height <= listaBox.y + listaBox.height + 1) visibili++
+    }
+    expect(visibili).toBeGreaterThanOrEqual(6)
+  })
+
+  test('questo e i successivi su spostamento ed eliminazione con Annulla', async ({ page }) => {
+    await impostaDataAgenda(page, '2026-11-17')
+    await page.locator('.agenda-btn-nuovo-testata').click()
+    await page.getByPlaceholder('Nome o ultime cifre del telefono').fill('Ripeti Serie')
+    await page.getByRole('button', { name: 'Cliente nuovo' }).click()
+    await page.getByLabel('Nome').fill('Ripeti Serie')
+    await page.getByLabel('Telefono').fill('333 000 0666')
+    await page.getByRole('button', { name: 'Aggiungi cliente' }).click()
+    await page.getByRole('button', { name: 'Ripeti…' }).click()
+    await page.getByRole('button', { name: 'Ogni settimana' }).click()
+    await page.getByRole('button', { name: /Crea \d+ appuntament/ }).click()
+    await page.locator('.app-blocco-serie-mark').first().click()
+    await page.getByRole('button', { name: 'Sposta' }).click()
+    await page.locator('.sposta-box input[type="time"]').fill('11:00')
+    await page.getByRole('button', { name: 'Conferma spostamento' }).click()
+    await page.getByRole('button', { name: 'Questo e i successivi' }).click()
+    await page.getByRole('button', { name: 'Annulla' }).last().click()
+    await page.locator('.app-blocco-serie-mark').first().click()
+    await page.getByRole('button', { name: 'Elimina' }).click()
+    await page.getByRole('button', { name: 'Sì, elimina' }).click()
+    await page.getByRole('button', { name: 'Questo e i successivi' }).click()
+    await page.getByRole('button', { name: 'Annulla' }).last().click()
+    await expect(page.locator('.app-blocco-serie-mark').first()).toBeVisible()
   })
 })
 

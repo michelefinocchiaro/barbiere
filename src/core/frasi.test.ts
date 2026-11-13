@@ -79,9 +79,10 @@ describe('fraseDelMomento', () => {
     expect(frasi.size).toBeGreaterThanOrEqual(2)
   })
 
-  it('usa le frasi personalizzate del negozio', () => {
-    const imp: Impostazioni = { ...impBase, frasi: { mattina: ['A {teste}'] } }
-    expect(fraseDelMomento('mattina', contesto(martedi, { teste: 3 }), imp)).toBe('A 3')
+  it('scarta frasi personalizzate con {teste} o {restanti}', () => {
+    const imp: Impostazioni = { ...impBase, frasi: { mattina: ['A {teste}', 'Tutti in piedi'] } }
+    expect(fraseDelMomento('mattina', contesto(martedi), imp)).toBe('Tutti in piedi')
+    expect(fraseDelMomento('mattina', contesto(martedi), imp)).not.toContain('{teste}')
   })
 
   it('con lista vuota usa le predefinite', () => {

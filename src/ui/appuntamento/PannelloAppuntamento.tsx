@@ -10,19 +10,29 @@ import type {
   StatoAppuntamento,
 } from '../../core'
 import {
+  appuntamentiSerie,
   cercaClienti,
+  componiMessaggioRapido,
   eliminaAppuntamento,
+  eliminaSerieDa,
   formattaOra,
+  giornoEsteso,
   formattaTelefono,
   impostaStato,
+  linkWhatsApp,
   normalizzaTelefono,
+  oggi,
+  ripristinaAppuntamenti,
   salvaAppuntamento,
   spostaAppuntamento,
+  spostaSerieDa,
   storicoCliente,
   trovaOCreaCliente,
   verificaAppuntamento,
 } from '../../core'
+import { ModuloRipeti } from './ModuloRipeti'
 import { AvvisiFascia } from '../components/AvvisiFascia'
+import { InviaRiepilogoCliente } from '../components/InviaRiepilogoCliente'
 import type { ToastAzione } from '../components/Toast'
 import {
   ModuloSegnaDaPagare,
@@ -52,9 +62,11 @@ interface Props {
   pannello: PannelloInput
   onChiudi: () => void
   onToast?: (t: ToastAzione) => void
+  onIniziaScambio?: (a: Appuntamento) => void
+  onVaiAData?: (data: ISODate, app: Appuntamento) => void
 }
 
-export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props) {
+export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast, onIniziaScambio, onVaiAData }: Props) {
   const modifica = isModifica(pannello)
   const esistente = modifica ? pannello.appuntamento : null
 
@@ -78,6 +90,8 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
   const [mostraSposta, setMostraSposta] = useState(false)
   const [confermaElimina, setConfermaElimina] = useState(false)
   const [mostraDebito, setMostraDebito] = useState(false)
+  const [mostraRipeti, setMostraRipeti] = useState(false)
+  const [sceltaSerie, setSceltaSerie] = useState<'sposta' | 'elimina' | null>(null)
 
   const campoRef = useRef<HTMLInputElement>(null)
   const moduloDebitoRef = useRef<ModuloSegnaDaPagareHandle>(null)
@@ -93,6 +107,15 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
     const tutti = await cercaClienti('', 500)
     return tutti.find((c) => c.id === esistente.clienteId) ?? null
   }, [esistente?.clienteId])
+
+  const serie = useLiveQuery(
+    () => (esistente?.serieId ? appuntamentiSerie(esistente.serieId) : Promise.resolve([])),
+    [esistente?.serieId],
+  )
+  const posizioneSerie =
+    esistente?.serieId && serie
+      ? serie.findIndex((a) => a.id === esistente.id) + 1
+      : 0
 
   useEffect(() => {
     campoRef.current?.focus()
@@ -207,7 +230,7 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
     onChiudi()
   }
 
-  const elimina = async () => {
+  const eliminaSolo = async () => {
     if (!esistente) return
     const copia = { ...esistente }
     await eliminaAppuntamento(esistente.id)
@@ -225,6 +248,7 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
           stato: copia.stato,
           promemoria: copia.promemoria,
           testoPromemoria: copia.testoPromemoria,
+          serieId: copia.serieId,
           id: copia.id,
         })
       },
@@ -232,7 +256,26 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
     onChiudi()
   }
 
-  const sposta = async () => {
+  const eliminaConSuccessivi = async () => {
+    if (!esistente?.serieId) return
+    const prima = await eliminaSerieDa(esistente.id)
+    onToast?.({
+      messaggio: `Eliminati ${prima.length} appuntamenti della serie`,
+      annulla: () => ripristinaAppuntamenti(prima),
+    })
+    onChiudi()
+  }
+
+  const elimina = async () => {
+    if (!esistente) return
+    if (esistente.serieId && serie && serie.length > 1) {
+      setSceltaSerie('elimina')
+      return
+    }
+    await eliminaSolo()
+  }
+
+  const spostaSolo = async () => {
     if (!esistente) return
     const prima = { data: esistente.data, ora: esistente.ora, operatoreId: esistente.operatoreId }
     await spostaAppuntamento(esistente.id, data, ora, operatoreId)
@@ -243,7 +286,34 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
       },
     })
     setMostraSposta(false)
+    setSceltaSerie(null)
     onChiudi()
+  }
+
+  const spostaConSuccessivi = async () => {
+    if (!esistente?.serieId) return
+    if (data !== esistente.data) {
+      await spostaSolo()
+      return
+    }
+    const prima = await spostaSerieDa(esistente.id, ora, operatoreId)
+    onToast?.({
+      messaggio: `Orario aggiornato su ${prima.length} appuntamenti`,
+      annulla: () => ripristinaAppuntamenti(prima),
+    })
+    setMostraSposta(false)
+    setSceltaSerie(null)
+    onChiudi()
+  }
+
+  const sposta = async () => {
+    if (!esistente) return
+    const cambiaOraOp = esistente.ora !== ora || esistente.operatoreId !== operatoreId
+    if (esistente.serieId && serie && serie.length > 1 && cambiaOraOp) {
+      setSceltaSerie('sposta')
+      return
+    }
+    await spostaSolo()
   }
 
   const telefonoMostra = clienteSel
@@ -251,6 +321,9 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
     : clienteEsistente
       ? formattaTelefono(clienteEsistente.telefono)
       : ''
+
+  const messaggiRapidi = imp.messaggiRapidi ?? []
+  const oggiIso = oggi()
 
   return (
     <aside className="pannello-app" role="dialog" aria-labelledby="pannello-titolo">
@@ -269,6 +342,16 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
               ✕
             </button>
           </>
+        ) : mostraRipeti ? (
+          <>
+            <button type="button" className="pannello-indietro" onClick={() => setMostraRipeti(false)}>
+              ‹ Appuntamento
+            </button>
+            <h2 id="pannello-titolo">Ripeti appuntamento</h2>
+            <button type="button" className="pannello-chiudi" onClick={onChiudi} aria-label="Chiudi">
+              ✕
+            </button>
+          </>
         ) : (
           <>
             <h2 id="pannello-titolo">{modifica ? 'Modifica appuntamento' : 'Nuovo appuntamento'}</h2>
@@ -279,7 +362,27 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
         )}
       </header>
 
-      {mostraDebito && clienteSel ? (
+      {mostraRipeti && clienteSel ? (
+        <div className="pannello-corpo">
+          <ModuloRipeti
+            imp={imp}
+            base={{
+              data,
+              ora,
+              durataMin,
+              operatoreId,
+              clienteId: clienteSel.id,
+              servizioId,
+              note: note || undefined,
+              stato: provvisorio ? 'provvisorio' : 'prenotato',
+              promemoria: esistente?.promemoria ?? 'da_inviare',
+            }}
+            onIndietro={() => setMostraRipeti(false)}
+            onChiudi={onChiudi}
+            onToast={onToast}
+          />
+        </div>
+      ) : mostraDebito && clienteSel ? (
         <div className="pannello-corpo pannello-corpo-debito">
           <ModuloSegnaDaPagare
             ref={moduloDebitoRef}
@@ -296,6 +399,8 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
         </div>
       ) : (
       <div className="pannello-corpo">
+        <div className="pannello-griglia">
+        <div className="pannello-dati">
         <label className="campo">
           Cliente
           <input
@@ -429,85 +534,181 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast }: Props
           onSalvaComunque={() => void salva(true)}
         />
 
-        {modifica && clienteSel ? (
-          <div className="telefono-grande">
-            <a href={`tel:+${clienteSel.telefono}`}>{telefonoMostra}</a>
+        {sceltaSerie ? (
+          <div className="conferma-serie" role="dialog" aria-label="Modifica serie">
+            <p>
+              {sceltaSerie === 'elimina'
+                ? 'Eliminare solo questo appuntamento o anche i successivi della serie?'
+                : 'Aggiornare solo questo o anche i successivi (stesse date)?'}
+            </p>
+            <button type="button" onClick={() => void (sceltaSerie === 'elimina' ? eliminaSolo() : spostaSolo())}>
+              Solo questo
+            </button>
+            <button
+              type="button"
+              className="btn-primario"
+              onClick={() => void (sceltaSerie === 'elimina' ? eliminaConSuccessivi() : spostaConSuccessivi())}
+            >
+              Questo e i successivi
+            </button>
+            <button type="button" className="btn-secondario" onClick={() => setSceltaSerie(null)}>
+              Annulla
+            </button>
           </div>
         ) : null}
+        </div>
 
-        {modifica && esistente ? (
-          <div className="azioni-modifica">
-            <button type="button" onClick={() => setMostraSposta((v) => !v)}>
-              Sposta
+        {clienteSel ? (
+        <div className="pannello-azioni-lato">
+          <section className="pannello-gruppo" aria-labelledby="pannello-gruppo-fisso">
+            <h3 id="pannello-gruppo-fisso" className="pannello-gruppo-titolo">
+              Fisso
+            </h3>
+            <button
+              type="button"
+              className="btn-secondario btn-ripeti"
+              onClick={() => setMostraRipeti(true)}
+            >
+              Ripeti…
             </button>
-            <button type="button" className="btn-disdici" onClick={() => void disdici()}>
-              Disdici
-            </button>
-            <button type="button" onClick={() => setMostraDebito(true)}>
-              Segna da pagare
-            </button>
-            {!confermaElimina ? (
-              <button type="button" className="btn-pericolo" onClick={() => setConfermaElimina(true)}>
-                Elimina
-              </button>
-            ) : (
-              <div className="conferma-elimina">
-                <span>Sicuro?</span>
-                <button type="button" onClick={() => setConfermaElimina(false)}>
-                  No
-                </button>
-                <button type="button" className="btn-pericolo" onClick={() => void elimina()}>
-                  Sì, elimina
-                </button>
-              </div>
-            )}
-          </div>
-        ) : null}
-
-        {mostraSposta && esistente ? (
-          <div className="sposta-box">
-            <label>
-              Data
-              <input
-                type="date"
-                value={inputDateVal(data)}
-                onChange={(e) => setData(e.target.value as ISODate)}
-              />
-            </label>
-            <label>
-              Ora
-              <input type="time" value={ora} onChange={(e) => setOra(e.target.value as HHMM)} />
-            </label>
-            <label>
-              Operatore
-              <select value={operatoreId} onChange={(e) => setOperatoreId(e.target.value)}>
-                {imp.operatori
-                  .filter((o) => o.attivo)
-                  .map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.nome}
-                    </option>
+            {modifica && esistente?.serieId && serie && serie.length > 0 ? (
+              <section className="pannello-serie" aria-label="Appuntamenti fissi">
+                <p className="pannello-serie-titolo">
+                  Appuntamento fisso · {posizioneSerie} di {serie.length}
+                </p>
+                <ul className="pannello-serie-date">
+                  {serie.map((a) => (
+                    <li key={a.id}>
+                      <button
+                        type="button"
+                        className={a.id === esistente.id ? 'attivo' : ''}
+                        onClick={() => onVaiAData?.(a.data, a)}
+                      >
+                        {giornoEsteso(a.data)} · {formattaOra(a.ora)}
+                      </button>
+                    </li>
                   ))}
-              </select>
-            </label>
-            <div className="sposta-azioni">
-              <button type="button" onClick={() => void sposta()}>
-                Conferma spostamento
-              </button>
-              <button type="button" onClick={() => setMostraSposta(false)}>
-                Annulla
-              </button>
-            </div>
-          </div>
-        ) : null}
+                </ul>
+              </section>
+            ) : null}
+          </section>
 
         {modifica && clienteSel ? (
-          <StoricoCliente clienteId={clienteSel.id} formattaOra={formattaOra} />
+          <section className="pannello-gruppo" aria-labelledby="pannello-gruppo-messaggi">
+            <h3 id="pannello-gruppo-messaggi" className="pannello-gruppo-titolo">
+              Messaggi
+            </h3>
+            <div className="telefono-grande">
+              <a href={`tel:+${clienteSel.telefono}`}>{telefonoMostra}</a>
+            </div>
+            {esistente && messaggiRapidi.length > 0 ? (
+              <div className="messaggi-rapidi">
+                <span className="etichetta-sezione">Messaggi rapidi</span>
+                <div className="griglia-messaggi-rapidi">
+                  {messaggiRapidi.map((m) => {
+                    const testo = componiMessaggioRapido(m, esistente, clienteSel, oggiIso)
+                    const href = linkWhatsApp(clienteSel.telefono, testo)
+                    return (
+                      <a
+                        key={m.id}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-messaggio-rapido"
+                      >
+                        {m.etichetta}
+                      </a>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : null}
+            <InviaRiepilogoCliente clienteId={clienteSel.id} />
+          </section>
         ) : null}
+
+        {modifica && esistente && clienteSel ? (
+          <section className="pannello-gruppo" aria-labelledby="pannello-gruppo-altro">
+            <h3 id="pannello-gruppo-altro" className="pannello-gruppo-titolo">
+              Altro
+            </h3>
+            <div className="azioni-modifica">
+              <button type="button" onClick={() => setMostraSposta((v) => !v)}>
+                Sposta
+              </button>
+              {onIniziaScambio ? (
+                <button type="button" onClick={() => onIniziaScambio(esistente)}>
+                  Scambia con…
+                </button>
+              ) : null}
+              <button type="button" className="btn-disdici" onClick={() => void disdici()}>
+                Disdici
+              </button>
+              <button type="button" onClick={() => setMostraDebito(true)}>
+                Segna da pagare
+              </button>
+              {!confermaElimina ? (
+                <button type="button" className="btn-pericolo" onClick={() => setConfermaElimina(true)}>
+                  Elimina
+                </button>
+              ) : (
+                <div className="conferma-elimina">
+                  <span>Sicuro?</span>
+                  <button type="button" onClick={() => setConfermaElimina(false)}>
+                    No
+                  </button>
+                  <button type="button" className="btn-pericolo" onClick={() => void elimina()}>
+                    Sì, elimina
+                  </button>
+                </div>
+              )}
+            </div>
+            {mostraSposta ? (
+              <div className="sposta-box">
+                <label>
+                  Data
+                  <input
+                    type="date"
+                    value={inputDateVal(data)}
+                    onChange={(e) => setData(e.target.value as ISODate)}
+                  />
+                </label>
+                <label>
+                  Ora
+                  <input type="time" value={ora} onChange={(e) => setOra(e.target.value as HHMM)} />
+                </label>
+                <label>
+                  Operatore
+                  <select value={operatoreId} onChange={(e) => setOperatoreId(e.target.value)}>
+                    {imp.operatori
+                      .filter((o) => o.attivo)
+                      .map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.nome}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <div className="sposta-azioni">
+                  <button type="button" onClick={() => void sposta()}>
+                    Conferma spostamento
+                  </button>
+                  <button type="button" onClick={() => setMostraSposta(false)}>
+                    Annulla
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            <StoricoCliente clienteId={clienteSel.id} formattaOra={formattaOra} />
+          </section>
+        ) : null}
+        </div>
+        ) : null}
+        </div>
       </div>
       )}
 
-      <footer className="pannello-piede">
+      <footer className="pannello-piede" hidden={mostraRipeti}>
         {mostraDebito ? (
           <button
             type="button"

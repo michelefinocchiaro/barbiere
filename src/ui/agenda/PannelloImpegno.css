@@ -1,0 +1,25 @@
+.pannello-impegno {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 150;
+  width: min(420px, 100vw);
+  background: var(--tc-superficie);
+  border-left: 1px solid var(--tc-argento-scuro);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.35);
+}
+
+.pannello-impegno-orari {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.pannello-impegno-nota {
+  margin: 0;
+  font-size: var(--tc-fs-sm);
+  color: var(--tc-argento);
+}

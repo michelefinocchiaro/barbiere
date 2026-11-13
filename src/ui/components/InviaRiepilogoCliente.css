@@ -1,0 +1,21 @@
+.invia-riepilogo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.invia-riepilogo-anteprima {
+  margin: 0;
+  padding: 0.65rem;
+  background: var(--tc-nero);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  font-size: var(--tc-fs-sm);
+  white-space: pre-wrap;
+  color: var(--tc-crema);
+}
+
+.invia-riepilogo-wa {
+  text-align: center;
+  text-decoration: none;
+}

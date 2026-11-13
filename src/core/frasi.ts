@@ -1,25 +1,27 @@
 import type { ContestoFrase, HHMM, Impostazioni, ISODate, MomentoFrase, Operatore } from './tipi.ts'
 
+const SEGNAPOSTO_ESCLUSI = /\{teste\}|\{restanti\}/
+
 export const FRASI_PREDEFINITE: Record<MomentoFrase, string[]> = {
   mattina: [
-    'Buongiorno! Oggi {teste} teste da sistemare 💈',
-    'Caffè fatto? Si parte: {teste} appuntamenti in agenda ☕',
-    'Forbici affilate, {teste} clienti in arrivo ✂️',
+    'Buongiorno! Si parte con le forbici affilate ☕💈',
+    'Caffè fatto? Agenda pronta, si lavora',
+    'Nuovo giorno, poltrona in posizione ✂️',
   ],
   pomeriggio: [
-    'Si riparte! Ancora {restanti} da fare 💪',
-    'Pomeriggio pieno: {restanti} teste ancora in coda',
-    'Mezza giornata fatta, ne mancano {restanti}',
+    'Si riparte! Mezza giornata fatta 💪',
+    'Pomeriggio in sala: si continua',
+    'Ora di spingere fino a chiusura',
   ],
   sera: [
     'Ultimi tagli e si chiude 🌙',
-    'Ancora {restanti}, poi tutti a casa',
-    'Rush finale: {restanti} e abbiamo finito',
+    'Rush finale, poi tutti a casa',
+    'Sprint della serata in corso',
   ],
   fine_giornata: [
-    'Giornata chiusa: {teste} teste sistemate. Bel lavoro! 💈',
-    '{teste} clienti serviti oggi. Si spazza e si va 🧹',
-    'Fatto! {teste} appuntamenti, zero pensieri',
+    'Giornata chiusa. Bel lavoro! 💈',
+    'Si spazza e si va 🧹',
+    'Fatto! Zero pensieri fino a domani',
   ],
   giornata_vuota: [
     'Agenda libera… {operatore}, è l\'ora del caffè ☕',
@@ -41,6 +43,12 @@ export const FRASI_PREDEFINITE: Record<MomentoFrase, string[]> = {
     'Scaldo il rasoio…',
     'Preparo la poltrona…',
   ],
+}
+
+function frasiUsabili(momento: MomentoFrase, imp: Impostazioni): string[] {
+  const personalizzate = imp.frasi?.[momento]?.filter((f) => !SEGNAPOSTO_ESCLUSI.test(f)) ?? []
+  if (personalizzate.length > 0) return personalizzate
+  return FRASI_PREDEFINITE[momento]
 }
 
 function localDateFromISODate(iso: ISODate): Date {
@@ -105,12 +113,18 @@ function quando(dataAppuntamento: ISODate, oggi: ISODate): string {
 function prossimoGiornoApertura(
   da: ISODate,
   imp: Impostazioni,
-  blocchi: { operatoreId: string | null; data: ISODate; dalle?: HHMM; alle?: HHMM }[],
+  blocchi: { operatoreId: string | null; data: ISODate; dalle?: HHMM; alle?: HHMM; tipo?: 'assenza' | 'impegno' }[],
 ): ISODate {
   const giorni = new Set(imp.giorniApertura)
   const blocchiInteri = new Set(
     blocchi
-      .filter((b) => b.operatoreId === null && b.dalle === undefined && b.alle === undefined)
+      .filter(
+        (b) =>
+          b.tipo !== 'impegno' &&
+          b.operatoreId === null &&
+          b.dalle === undefined &&
+          b.alle === undefined,
+      )
       .map((b) => b.data),
   )
   const data = localDateFromISODate(da)
@@ -127,12 +141,13 @@ function prossimoGiornoApertura(
 function negozioChiuso(
   data: ISODate,
   imp: Impostazioni,
-  blocchi: { operatoreId: string | null; data: ISODate; dalle?: HHMM; alle?: HHMM }[],
+  blocchi: { operatoreId: string | null; data: ISODate; dalle?: HHMM; alle?: HHMM; tipo?: 'assenza' | 'impegno' }[],
 ): boolean {
   const giorno = localDateFromISODate(data).getDay()
   if (!imp.giorniApertura.includes(giorno)) return true
   return blocchi.some(
     (b) =>
+      b.tipo !== 'impegno' &&
       b.operatoreId === null &&
       b.data === data &&
       b.dalle === undefined &&
@@ -167,16 +182,11 @@ export function fraseDelMomento(
   contesto: ContestoFrase,
   imp: Impostazioni,
 ): string {
-  const listaPersonalizzata = imp.frasi?.[momento]
-  const lista = listaPersonalizzata && listaPersonalizzata.length > 0
-    ? listaPersonalizzata
-    : FRASI_PREDEFINITE[momento]
+  const lista = frasiUsabili(momento, imp)
   const hash = fnv1a32(`${contesto.data}:${momento}`)
   const modello = lista[hash % lista.length]
   const prossimo = prossimoGiornoApertura(contesto.data, imp, [])
   return componiPromemoria(modello, {
-    teste: String(contesto.teste ?? 0),
-    restanti: String(contesto.restanti ?? 0),
     prossimo: contesto.prossimo ?? quando(prossimo, contesto.data),
     operatore: operatoreAttivoPerHash(imp.operatori, hash),
   })

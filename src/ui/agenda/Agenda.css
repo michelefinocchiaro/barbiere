@@ -71,6 +71,68 @@
   color: var(--tc-argento);
 }
 
+.agenda-vista-toggle {
+  display: flex;
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.agenda-vista-toggle button {
+  padding: 0.35rem 0.65rem;
+  min-height: var(--tc-tocco-min);
+  font-size: var(--tc-fs-sm);
+  background: transparent;
+  color: var(--tc-argento);
+}
+
+.agenda-vista-toggle button.attivo {
+  background: var(--tc-oro);
+  color: var(--tc-nero);
+  font-weight: 600;
+}
+
+.agenda-fascia-chiuso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  margin: 0.15rem 0;
+}
+
+.agenda-giorno-chiuso .agenda-griglia-wrap {
+  opacity: 0.92;
+}
+
+.agenda-impegni-giorno {
+  list-style: none;
+  margin: 0 0 0.35rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.agenda-impegno-riga {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 8px;
+  border: 1px dashed var(--tc-oro);
+  background: rgba(139, 105, 20, 0.12);
+  text-align: left;
+}
+
+.agenda-impegno-titolo {
+  font-weight: 600;
+}
+
+.agenda-vista-settimana {
+  min-height: 0;
+}
+
 .agenda-intestazione {
   display: flex;
   flex-direction: column;
@@ -85,7 +147,27 @@
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  row-gap: 0.35rem;
+}
+
+@media (min-width: 701px) {
+  .agenda-titolo {
+    flex: 1 1 6rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .agenda-vista-toggle {
+    flex-shrink: 0;
+  }
+
+  .agenda-btn-nuovo-testata {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
 }
 
 .agenda-riga-battuta {
@@ -320,6 +402,7 @@
   background: var(--tc-blu);
   color: var(--tc-crema);
   border-radius: 6px;
+  border-left: 4px solid var(--tc-blu);
   padding: 0.25rem 0.5rem;
   text-align: left;
   display: flex;
@@ -375,6 +458,14 @@
   right: 6px;
   color: var(--tc-verde-salvia);
   font-weight: bold;
+}
+
+.app-blocco-serie-mark {
+  position: absolute;
+  top: 4px;
+  right: 1.4rem;
+  font-size: 0.75rem;
+  opacity: 0.9;
 }
 
 .btn-primario {
@@ -442,4 +533,77 @@
 
 .agenda-con-pfab .agenda-griglia-wrap {
   padding-bottom: 4.5rem;
+}
+
+.agenda-scambio-fascia {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  background: var(--tc-oro-scuro, #8b6914);
+  color: var(--tc-nero);
+  font-weight: 600;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.agenda-scambio-fascia button {
+  color: var(--tc-nero);
+  text-decoration: underline;
+  min-height: var(--tc-tocco-min);
+}
+
+.agenda-scambio-conferma {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.agenda-scambio-conferma-interno {
+  background: var(--tc-superficie);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 12px;
+  padding: 1.25rem;
+  max-width: 420px;
+  width: 100%;
+}
+
+.agenda-scambio-dettagli {
+  list-style: none;
+  margin: 0.75rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.agenda-scambio-dettagli li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.agenda-scambio-azioni {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.agenda-scambio-attiva .app-blocco.scambio-origine {
+  outline: 2px solid var(--tc-oro);
+  outline-offset: 2px;
+}
+
+.agenda-scambio-attiva .app-blocco.scambio-bersaglio {
+  cursor: pointer;
+}
+
+.agenda-avvisi-scambio {
+  margin-bottom: 0.5rem;
 }

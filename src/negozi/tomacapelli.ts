@@ -22,13 +22,30 @@ export const impostazioni: Impostazioni = {
   testoPromemoria: `Ciao friend ti ricordiamo l’appuntamento di {quando}
 RESTIAMO IN ATTESA DI CONFERMA !! 😉💈💇🏻‍♂️👋🏻
 Ci vediamo alle {ora}`,
+  messaggiRapidi: [
+    {
+      id: 'puntuale',
+      etichetta: 'Sii puntuale',
+      testo: 'Ciao friend ti chiediamo di essere puntuale per l’appuntamento delle {ora} 😉💈',
+    },
+    {
+      id: 'ritardo-10',
+      etichetta: 'Ritarda 10 min',
+      ritardoMin: 10,
+      testo:
+        'Ciao friend siamo un po’ in ritardo, puoi venire 10 minuti dopo? Ci vediamo alle {ora_dopo} 👋🏻',
+    },
+  ],
+  testoRiepilogo: `Ciao friend ecco i tuoi appuntamenti:
+{elenco}
+RESTIAMO IN ATTESA DI CONFERMA !! 😉💈💇🏻‍♂️👋🏻`,
   frasi: {
     mattina: [
-      'Buongiorno friend! Oggi {teste} teste da sistemare 💈',
+      'Buongiorno friend! Si parte con le forbici affilate 💈',
       ...FRASI_PREDEFINITE.mattina,
     ],
     fine_giornata: [
-      '{teste} teste sistemate oggi. Grande squadra, friend! 💈',
+      'Grande squadra friend, giornata chiusa! 💈',
       ...FRASI_PREDEFINITE.fine_giornata,
     ],
     promemoria_finiti: [
@@ -36,7 +53,7 @@ Ci vediamo alle {ora}`,
       ...FRASI_PREDEFINITE.promemoria_finiti,
     ],
     giornata_vuota: [
-      'Agenda libera… {operatore}, è l\'ora del caffè ☕',
+      'Agenda libera friend… {operatore}, caffè? ☕',
       ...FRASI_PREDEFINITE.giornata_vuota,
     ],
   },

@@ -10,7 +10,8 @@ Sostituisce un'agenda di carta e messaggi scritti a mano uno per uno.
 
 1. **L'app aiuta chi prende gli appuntamenti, non lo sostituisce.** Avvisa ma non blocca, non fa
    niente da sola, ogni azione si annulla. Nei casi dubbi decide questa regola.
-2. **Zero costi.** Niente backend, niente API a pagamento. WhatsApp si apre con un link wa.me
+2. **Zero costi.** Niente backend, niente API a pagamento. WhatsApp si apre con un link
+   `api.whatsapp.com`
    e il messaggio lo invia la persona. Niente librerie WhatsApp non ufficiali: fanno bannare il numero.
 3. **Un solo codice per tutti i negozi.** Tutto quello che è di un negozio (nome, operatori,
    orari, testo del promemoria) sta in `src/negozi/<negozio>.ts` e `public/brand/`.

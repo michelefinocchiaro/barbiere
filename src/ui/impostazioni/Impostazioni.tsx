@@ -39,6 +39,7 @@ export function ImpostazioniSchermata() {
   const blocchi = useLiveQuery(() => blocchiDelGiorno(bloccoData), [bloccoData])
   const fileRef = useRef<HTMLInputElement>(null)
   const [confermaImport, setConfermaImport] = useState<File | null>(null)
+  const [erroreImport, setErroreImport] = useState<string | null>(null)
   const [confermaDemo, setConfermaDemo] = useState<'demo' | 'svuota' | null>(null)
 
   useEffect(() => {
@@ -93,9 +94,15 @@ export function ImpostazioniSchermata() {
   }
 
   const importa = async (file: File) => {
-    await importaBackup(file)
-    setConfermaImport(null)
-    setImp(await leggiImpostazioni())
+    setErroreImport(null)
+    try {
+      await importaBackup(file)
+      setConfermaImport(null)
+      setImp(await leggiImpostazioni())
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Import non riuscito'
+      setErroreImport(msg)
+    }
   }
 
   const nuovoBlocco = async () => {
@@ -152,6 +159,53 @@ export function ImpostazioniSchermata() {
             <span className="imp-anteprima-etichetta">Anteprima WhatsApp</span>
             <pre>{anteprima}</pre>
           </div>
+        </section>
+
+        <section className="imp-sezione">
+          <h2>Messaggi rapidi</h2>
+          <p className="imp-nota">Dal pannello appuntamento. Segnaposto: {'{nome}'}, {'{ora}'}, {'{ora_dopo}'}, {'{quando}'}.</p>
+          <ul className="imp-lista-messaggi">
+            {(imp.messaggiRapidi ?? []).map((m) => (
+              <li key={m.id}>
+                <label>
+                  Etichetta
+                  <input
+                    value={m.etichetta}
+                    onChange={(e) => {
+                      const lista = (imp.messaggiRapidi ?? []).map((x) =>
+                        x.id === m.id ? { ...x, etichetta: e.target.value } : x,
+                      )
+                      setImp({ ...imp, messaggiRapidi: lista })
+                    }}
+                  />
+                </label>
+                <label>
+                  Testo WhatsApp
+                  <textarea
+                    rows={3}
+                    value={m.testo}
+                    onChange={(e) => {
+                      const lista = (imp.messaggiRapidi ?? []).map((x) =>
+                        x.id === m.id ? { ...x, testo: e.target.value } : x,
+                      )
+                      setImp({ ...imp, messaggiRapidi: lista })
+                    }}
+                  />
+                </label>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="imp-sezione">
+          <h2>Testo riepilogo appuntamenti</h2>
+          <p className="imp-nota">Per clienti con almeno 2 appuntamenti futuri. Segnaposto: {'{elenco}'}.</p>
+          <textarea
+            className="imp-testo"
+            rows={5}
+            value={imp.testoRiepilogo ?? ''}
+            onChange={(e) => setImp({ ...imp, testoRiepilogo: e.target.value })}
+          />
         </section>
 
         <section className="imp-sezione">
@@ -334,10 +388,14 @@ export function ImpostazioniSchermata() {
               className="sr-only"
               onChange={(e) => {
                 const f = e.target.files?.[0]
-                if (f) setConfermaImport(f)
+                if (f) {
+                  setErroreImport(null)
+                  setConfermaImport(f)
+                }
               }}
             />
           </div>
+          {erroreImport ? <p className="imp-errore-import">{erroreImport}</p> : null}
           {confermaImport ? (
             <div className="imp-conferma">
               <p>Importare sostituisce tutti i dati. Continuare?</p>

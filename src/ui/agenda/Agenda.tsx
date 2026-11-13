@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import type { Appuntamento, Blocco, Cliente, HHMM, ISODate, Impostazioni } from '../../core'
+import type { Appuntamento, Avviso, Blocco, Cliente, HHMM, ISODate, Impostazioni } from '../../core'
 import {
   appuntamentiDelGiorno,
+  appuntamentiTra,
   blocchiDelGiorno,
+  blocchiTra,
   formattaOra,
   fraseDelMomento,
+  giornoAperto,
   leggiImpostazioni,
   momentoDellaGiornata,
   oggi,
   prossimoGiornoApertura,
   quando,
+  scambiaAppuntamenti,
+  settimanaDi,
   tuttiIClienti,
 } from '../../core'
 import {
@@ -27,8 +32,13 @@ import { PannelloRicerca } from './PannelloRicerca'
 import type { ToastAzione } from '../components/Toast'
 import { Caricamento } from '../components/Caricamento'
 import { IllustrazioneForbici } from '../components/IllustrazioneForbici'
+import { AgendaSettimana } from './AgendaSettimana'
+import { PannelloImpegno } from './PannelloImpegno'
 import { primoSlotLibero } from './primoSlotLibero'
+import { coloreOperatore } from '../utils/coloreOperatore'
+import { leggiVistaAgenda, salvaVistaAgenda, type VistaAgenda } from './vistaAgenda'
 import './Agenda.css'
+import './AgendaSettimana.css'
 
 interface SlotTap {
   data: ISODate
@@ -39,6 +49,13 @@ interface SlotTap {
 interface ModificaTap {
   appuntamento: Appuntamento
 }
+
+interface ImpegnoTap {
+  data: ISODate
+  blocco?: Blocco
+}
+
+type PannelloAgenda = SlotTap | ModificaTap
 
 interface AgendaProps {
   onToast?: (t: ToastAzione) => void
@@ -73,9 +90,17 @@ function conteggioServizi(appuntamenti: Appuntamento[], imp: Impostazioni): stri
 export function Agenda({ onToast, dataIniziale }: AgendaProps) {
   const [data, setData] = useState<ISODate>(() => dataIniziale ?? oggi())
   const [nascondiDisdetti, setNascondiDisdetti] = useState(true)
-  const [pannello, setPannello] = useState<SlotTap | ModificaTap | null>(null)
+  const [vista, setVista] = useState<VistaAgenda>(() => leggiVistaAgenda())
+  const [settimanaAncora, setSettimanaAncora] = useState<ISODate>(() => dataIniziale ?? oggi())
+  const [pannello, setPannello] = useState<PannelloAgenda | null>(null)
+  const [pannelloImpegno, setPannelloImpegno] = useState<ImpegnoTap | null>(null)
   const [ricercaAperta, setRicercaAperta] = useState(false)
   const [scrollAppId, setScrollAppId] = useState<string | null>(null)
+  const [scambioDa, setScambioDa] = useState<Appuntamento | null>(null)
+  const [confermaScambio, setConfermaScambio] = useState<{ da: Appuntamento; con: Appuntamento } | null>(
+    null,
+  )
+  const [avvisiScambio, setAvvisiScambio] = useState<Avviso[]>([])
   const dataInputRef = useRef<HTMLInputElement>(null)
   const grigliaRef = useRef<HTMLDivElement>(null)
   const oraCorrente = useMinuto()
@@ -87,6 +112,17 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
   const imp = useLiveQuery(() => leggiImpostazioni(), [])
   const appuntamenti = useLiveQuery(() => appuntamentiDelGiorno(data), [data])
   const blocchi = useLiveQuery(() => blocchiDelGiorno(data), [data])
+  const settimanaGiorni = useMemo(() => settimanaDi(settimanaAncora), [settimanaAncora])
+  const settimanaDa = settimanaGiorni[0]!
+  const settimanaA = settimanaGiorni[6]!
+  const appuntamentiSettimana = useLiveQuery(
+    () => (vista === 'settimana' ? appuntamentiTra(settimanaDa, settimanaA) : Promise.resolve([])),
+    [vista, settimanaDa, settimanaA],
+  )
+  const blocchiSettimana = useLiveQuery(
+    () => (vista === 'settimana' ? blocchiTra(settimanaDa, settimanaA) : Promise.resolve([])),
+    [vista, settimanaDa, settimanaA],
+  )
 
   const operatoriAttivi = useMemo(
     () => (imp ? [...imp.operatori].filter((o) => o.attivo).sort((a, b) => a.ordine - b.ordine) : []),
@@ -126,7 +162,16 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
   }, [imp, data, oraMomento, blocchi, teste, restanti])
 
   const chiuso = momento === 'chiuso'
-  const giornataVuota = momento === 'giornata_vuota'
+  const negozioAperto = imp ? giornoAperto(data, imp, blocchi ?? []) : true
+  const giornataVuota = momento === 'giornata_vuota' && negozioAperto
+  const blocchiAssenza = useMemo(
+    () => (blocchi ?? []).filter((b) => b.tipo !== 'impegno'),
+    [blocchi],
+  )
+  const impegniGiorno = useMemo(
+    () => (blocchi ?? []).filter((b) => b.tipo === 'impegno'),
+    [blocchi],
+  )
 
   const contestoFrase = useMemo(() => {
     if (!imp) return { data, teste, restanti }
@@ -182,8 +227,54 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
     setRicercaAperta(false)
     setPannello(tap)
   }, [])
-  const apriModifica = useCallback((a: Appuntamento) => setPannello({ appuntamento: a }), [])
+  const apriModifica = useCallback(
+    (a: Appuntamento) => {
+      if (scambioDa) {
+        if (a.id === scambioDa.id) return
+        setConfermaScambio({ da: scambioDa, con: a })
+        return
+      }
+      setPannello({ appuntamento: a })
+    },
+    [scambioDa],
+  )
   const chiudiPannello = useCallback(() => setPannello(null), [])
+
+  const vaiAAppuntamentoSerie = useCallback((dataSerie: ISODate, a: Appuntamento) => {
+    setData(dataSerie)
+    setSettimanaAncora(dataSerie)
+    setVista('giorno')
+    salvaVistaAgenda('giorno')
+    setPannello({ appuntamento: a })
+  }, [])
+
+  const iniziaScambio = useCallback((a: Appuntamento) => {
+    setPannello(null)
+    setScambioDa(a)
+    setData(a.data)
+  }, [])
+
+  const annullaScambio = useCallback(() => {
+    setScambioDa(null)
+    setConfermaScambio(null)
+  }, [])
+
+  const confermaScambioEsegui = useCallback(async () => {
+    if (!confermaScambio) return
+    const { da, con } = confermaScambio
+    const { avvisi } = await scambiaAppuntamenti(da.id, con.id)
+    setConfermaScambio(null)
+    setScambioDa(null)
+    setAvvisiScambio(avvisi)
+    onToast?.({
+      messaggio: 'Scambiati',
+      annulla: () => {
+        void scambiaAppuntamenti(da.id, con.id).then(() => setAvvisiScambio([]))
+      },
+    })
+    setData(da.data)
+    setScrollAppId(da.id)
+  }, [confermaScambio, onToast])
 
   const apriNuovoAutomatico = useCallback(() => {
     if (!imp) return
@@ -208,9 +299,78 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
     [],
   )
 
-  const vaiOggi = () => setData(oggiIso)
-  const giornoPrima = () => setData((d) => aggiungiGiorni(d, -1))
-  const giornoDopo = () => setData((d) => aggiungiGiorni(d, 1))
+  const cambiaVista = (v: VistaAgenda) => {
+    setVista(v)
+    salvaVistaAgenda(v)
+    if (v === 'settimana') setSettimanaAncora(data)
+  }
+
+  const vaiOggi = () => {
+    setData(oggiIso)
+    setSettimanaAncora(oggiIso)
+  }
+  const giornoPrima = () => {
+    if (vista === 'settimana') setSettimanaAncora((d) => aggiungiGiorni(d, -7))
+    else setData((d) => aggiungiGiorni(d, -1))
+  }
+  const giornoDopo = () => {
+    if (vista === 'settimana') setSettimanaAncora((d) => aggiungiGiorni(d, 7))
+    else setData((d) => aggiungiGiorni(d, 1))
+  }
+
+  const apriGiornoDaSettimana = (iso: ISODate) => {
+    setData(iso)
+    setVista('giorno')
+    salvaVistaAgenda('giorno')
+  }
+
+  const apriNuovoImpegno = useCallback((giorno: ISODate) => {
+    setPannelloImpegno({ data: giorno })
+  }, [])
+
+  const apriModificaImpegno = useCallback((b: Blocco) => {
+    setPannelloImpegno({ data: b.data, blocco: b })
+  }, [])
+
+  const nuovoAppuntamentoGiorno = useCallback(
+    (giorno: ISODate) => {
+      if (!imp) return
+      const { ora, operatoreId } = primoSlotLibero(
+        giorno,
+        imp,
+        (vista === 'settimana' ? appuntamentiSettimana : appuntamenti) ?? [],
+        (vista === 'settimana' ? blocchiSettimana : blocchi) ?? [],
+        operatoriAttivi,
+        oraCorrente,
+      )
+      if (operatoreId) apriNuovo({ data: giorno, ora, operatoreId })
+    },
+    [
+      imp,
+      vista,
+      appuntamentiSettimana,
+      appuntamenti,
+      blocchiSettimana,
+      blocchi,
+      operatoriAttivi,
+      oraCorrente,
+      apriNuovo,
+    ],
+  )
+
+  const nomeOperatore = (id: string) => imp?.operatori.find((o) => o.id === id)?.nome ?? '…'
+
+  const rigaScambio = (prima: Appuntamento, nuovoSlot: Appuntamento) => {
+    const sinistra: string[] = []
+    const destra: string[] = []
+    if (prima.data !== nuovoSlot.data) {
+      sinistra.push(formattaDataBreve(prima.data))
+      destra.push(formattaDataBreve(nuovoSlot.data))
+    }
+    sinistra.push(`${formattaOra(prima.ora)} con ${nomeOperatore(prima.operatoreId)}`)
+    destra.push(`${formattaOra(nuovoSlot.ora)} con ${nomeOperatore(nuovoSlot.operatoreId)}`)
+    return `${sinistra.join(' ')} → ${destra.join(' ')}`
+  }
 
   const apriPickerData = () => {
     const el = dataInputRef.current
@@ -222,12 +382,6 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
     const op = operatoriAttivi[0]
     const ora = slots[0]
     if (op && ora) apriNuovo({ data, ora, operatoreId: op.id })
-  }
-
-  const aggiungiComunque = () => {
-    const op = operatoriAttivi[0]
-    const ora = imp?.apre ?? '08:00'
-    if (op) apriNuovo({ data, ora, operatoreId: op.id })
   }
 
   useEffect(() => {
@@ -262,20 +416,96 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
     return <Caricamento className="agenda-caricamento" />
   }
 
-  const prossimoAperto = prossimoGiornoApertura(data, imp, blocchi ?? [])
   const fraseChiuso = fraseDelMomento('chiuso', contestoFrase, imp)
   const fraseVuota = fraseDelMomento('giornata_vuota', contestoFrase, imp)
+
+  const pannelloImpegnoEl = pannelloImpegno ? (
+    <>
+      <div className="pannello-backdrop" role="presentation" onClick={() => setPannelloImpegno(null)} />
+      <PannelloImpegno
+        imp={imp}
+        data={pannelloImpegno.data}
+        blocco={pannelloImpegno.blocco}
+        onChiudi={() => setPannelloImpegno(null)}
+        onToast={onToast}
+      />
+    </>
+  ) : null
+
+  const scambioFascia = scambioDa ? (
+    <div className="agenda-scambio-fascia" role="status">
+      <span>Tocca l&apos;appuntamento con cui scambiare</span>
+      <button type="button" onClick={annullaScambio}>
+        Annulla
+      </button>
+    </div>
+  ) : null
+
+  const overlayConfermaScambio = confermaScambio ? (
+    <div className="agenda-scambio-conferma" role="dialog" aria-labelledby="scambio-titolo">
+      <div className="agenda-scambio-conferma-interno">
+        <h2 id="scambio-titolo">Confermi lo scambio?</h2>
+        <ul className="agenda-scambio-dettagli">
+          <li>
+            <strong>{mappaClienti.get(confermaScambio.da.clienteId)?.nome ?? '…'}</strong>
+            <span>{rigaScambio(confermaScambio.da, confermaScambio.con)}</span>
+          </li>
+          <li>
+            <strong>{mappaClienti.get(confermaScambio.con.clienteId)?.nome ?? '…'}</strong>
+            <span>{rigaScambio(confermaScambio.con, confermaScambio.da)}</span>
+          </li>
+        </ul>
+        <div className="agenda-scambio-azioni">
+          <button type="button" className="btn-primario" onClick={() => void confermaScambioEsegui()}>
+            Scambia
+          </button>
+          <button type="button" onClick={() => setConfermaScambio(null)}>
+            Indietro
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null
+
+  const avvisiDopoScambio =
+    avvisiScambio.length > 0 ? (
+      <div className="avvisi-fascia agenda-avvisi-scambio" role="alert">
+        <ul>
+          {avvisiScambio.map((a, i) => (
+            <li key={i}>{a.messaggio}</li>
+          ))}
+        </ul>
+        <button type="button" className="btn-secondario" onClick={() => setAvvisiScambio([])}>
+          Chiudi
+        </button>
+      </div>
+    ) : null
 
   const intestazione = (
     <header className="agenda-intestazione">
       <div className="agenda-riga-principale">
-        <button type="button" className="nav-freccia" onClick={giornoPrima} aria-label="Giorno precedente">
+        <button
+          type="button"
+          className="nav-freccia"
+          onClick={giornoPrima}
+          aria-label={vista === 'settimana' ? 'Settimana precedente' : 'Giorno precedente'}
+        >
           <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
-        <h1 className="agenda-titolo font-titolo" onClick={apriPickerData}>
-          {formattaDataLunga(data)}
+        <h1
+          className="agenda-titolo font-titolo"
+          onClick={vista === 'giorno' ? apriPickerData : undefined}
+        >
+          {vista === 'settimana'
+            ? `Settimana ${formattaDataBreve(settimanaDa)} – ${formattaDataBreve(settimanaA)}`
+            : formattaDataLunga(data)}
         </h1>
-        <button type="button" className="nav-freccia" onClick={giornoDopo} aria-label="Giorno successivo">
+        <button
+          type="button"
+          className="nav-freccia"
+          onClick={giornoDopo}
+          aria-label={vista === 'settimana' ? 'Settimana successiva' : 'Giorno successivo'}
+        >
           <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         <button
@@ -292,19 +522,39 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
         <button type="button" className="btn-oggi" onClick={vaiOggi}>
           Oggi
         </button>
+        <div className="agenda-vista-toggle" role="group" aria-label="Vista agenda">
+          <button
+            type="button"
+            className={vista === 'giorno' ? 'attivo' : ''}
+            aria-pressed={vista === 'giorno'}
+            onClick={() => cambiaVista('giorno')}
+          >
+            Giorno
+          </button>
+          <button
+            type="button"
+            className={vista === 'settimana' ? 'attivo' : ''}
+            aria-pressed={vista === 'settimana'}
+            onClick={() => cambiaVista('settimana')}
+          >
+            Settimana
+          </button>
+        </div>
         <button type="button" className="agenda-btn-nuovo-testata" onClick={apriNuovoAutomatico}>
           + Nuovo
         </button>
       </div>
-      <label className="agenda-data-picker">
-        <span className="sr-only">Scegli data</span>
-        <input
-          ref={dataInputRef}
-          type="date"
-          value={inputDateVal(data)}
-          onChange={(e) => setData(e.target.value as ISODate)}
-        />
-      </label>
+      {vista === 'giorno' ? (
+        <label className="agenda-data-picker">
+          <span className="sr-only">Scegli data</span>
+          <input
+            ref={dataInputRef}
+            type="date"
+            value={inputDateVal(data)}
+            onChange={(e) => setData(e.target.value as ISODate)}
+          />
+        </label>
+      ) : null}
       <div className="agenda-riga-battuta">
         <p className="agenda-battuta font-titolo">{chiuso || giornataVuota ? '' : battuta}</p>
         <label className="agenda-toggle-compatto">
@@ -316,6 +566,12 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
           <span>Disdetti</span>
         </label>
       </div>
+      {chiuso && vista === 'giorno' ? (
+        <p className="agenda-fascia-chiuso">
+          <span className="agenda-stato-label">Chiuso</span>
+          <span className="agenda-frase-momento font-titolo">{fraseChiuso}</span>
+        </p>
+      ) : null}
       {contoServizi ? <p className="agenda-conto-servizi font-tabular">{contoServizi}</p> : null}
       {barraTurno ? (
         <div className="agenda-barra-turno">
@@ -334,21 +590,29 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
     </header>
   )
 
-  if (chiuso) {
+  if (vista === 'settimana') {
     return (
-      <div className="agenda agenda-vista-chiuso">
+      <div className={`agenda agenda-vista-settimana${scambioDa ? ' agenda-scambio-attiva' : ''}`}>
+        {scambioFascia}
+        {avvisiDopoScambio}
         {intestazione}
-        <div className="agenda-vista-centro">
-          <IllustrazioneForbici />
-          <p className="agenda-stato-label">Chiuso</p>
-          <p className="agenda-frase-momento font-titolo">{fraseChiuso}</p>
-          <button type="button" className="btn-primario" onClick={() => setData(prossimoAperto)}>
-            Vai a {formattaDataBreve(prossimoAperto)}
-          </button>
-          <button type="button" className="agenda-link-discreto" onClick={aggiungiComunque}>
-            Aggiungi comunque un appuntamento
-          </button>
-        </div>
+        <AgendaSettimana
+          imp={imp}
+          ancora={settimanaAncora}
+          oggiIso={oggiIso}
+          appuntamenti={appuntamentiSettimana ?? []}
+          blocchi={blocchiSettimana ?? []}
+          nascondiDisdetti={nascondiDisdetti}
+          mappaClienti={mappaClienti}
+          onGiorno={apriGiornoDaSettimana}
+          onAppuntamento={(a) => {
+            setData(a.data)
+            setPannello({ appuntamento: a })
+          }}
+          onImpegno={apriModificaImpegno}
+          onNuovoAppuntamento={nuovoAppuntamentoGiorno}
+          onNuovoImpegno={apriNuovoImpegno}
+        />
         {ricercaAperta ? (
           <>
             <div className="pannello-backdrop" role="presentation" onClick={() => setRicercaAperta(false)} />
@@ -358,16 +622,44 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
         {pannello ? (
           <>
             <div className="pannello-backdrop" role="presentation" onClick={chiudiPannello} />
-            <PannelloAppuntamento imp={imp} pannello={pannello} onChiudi={chiudiPannello} onToast={onToast} />
+            <PannelloAppuntamento
+              imp={imp}
+              pannello={pannello}
+              onChiudi={chiudiPannello}
+              onToast={onToast}
+              onIniziaScambio={iniziaScambio}
+              onVaiAData={vaiAAppuntamentoSerie}
+            />
           </>
         ) : null}
+        {pannelloImpegnoEl}
+        {overlayConfermaScambio}
       </div>
     )
   }
 
   return (
-    <div className="agenda agenda-con-pfab">
+    <div
+      className={`agenda agenda-con-pfab${chiuso ? ' agenda-giorno-chiuso' : ''}${scambioDa ? ' agenda-scambio-attiva' : ''}`}
+    >
+      {scambioFascia}
+      {avvisiDopoScambio}
       {intestazione}
+
+      {impegniGiorno.length > 0 ? (
+        <ul className="agenda-impegni-giorno">
+          {impegniGiorno.map((b) => (
+            <li key={b.id}>
+              <button type="button" className="agenda-impegno-riga" onClick={() => apriModificaImpegno(b)}>
+                <span className="agenda-impegno-titolo">{b.motivo}</span>
+                <span className="agenda-impegno-ora font-tabular">
+                  {b.dalle ? `${formattaOra(b.dalle)}${b.alle ? `–${formattaOra(b.alle)}` : ''}` : 'Tutto il giorno'}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       <div className="agenda-griglia-wrap" ref={grigliaRef}>
         <div className="agenda-ore" style={{ '--slot-count': slotCount } as React.CSSProperties}>
@@ -379,22 +671,24 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
           <div className="agenda-ora-chiusura font-tabular">{formattaOra(imp.chiude)}</div>
         </div>
         <div className="agenda-colonne">
-          {operatoriAttivi.map((op) => (
+          {              operatoriAttivi.map((op) => (
             <ColonnaOperatore
               key={op.id}
               nome={op.nome}
               operatoreId={op.id}
+              coloreOperatore={coloreOperatore(op.id, imp)}
               data={data}
               slots={slots}
               passo={passo}
               slotCount={slotCount}
               apreMin={apreMin}
               appuntamenti={visibili.filter((a) => a.operatoreId === op.id)}
-              blocchi={(blocchi ?? []).filter((b) => b.operatoreId === null || b.operatoreId === op.id)}
+              blocchi={blocchiAssenza.filter((b) => b.operatoreId === null || b.operatoreId === op.id)}
               servizi={imp.servizi}
               mappaClienti={mappaClienti}
               onSlotTap={apriNuovo}
               onAppuntamentoTap={apriModifica}
+              scambioEvidenzaId={scambioDa?.id}
             />
           ))}
         </div>
@@ -423,9 +717,18 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
       {pannello ? (
         <>
           <div className="pannello-backdrop" role="presentation" onClick={chiudiPannello} />
-          <PannelloAppuntamento imp={imp} pannello={pannello} onChiudi={chiudiPannello} onToast={onToast} />
+          <PannelloAppuntamento
+            imp={imp}
+            pannello={pannello}
+            onChiudi={chiudiPannello}
+            onToast={onToast}
+            onIniziaScambio={iniziaScambio}
+            onVaiAData={vaiAAppuntamentoSerie}
+          />
         </>
       ) : null}
+      {pannelloImpegnoEl}
+      {overlayConfermaScambio}
     </div>
   )
 }
@@ -433,6 +736,7 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
 interface ColonnaProps {
   nome: string
   operatoreId: string
+  coloreOperatore: string
   data: ISODate
   slots: HHMM[]
   passo: number
@@ -444,11 +748,13 @@ interface ColonnaProps {
   mappaClienti: Map<string, Cliente>
   onSlotTap: (t: SlotTap) => void
   onAppuntamentoTap: (a: Appuntamento) => void
+  scambioEvidenzaId?: string
 }
 
 function ColonnaOperatore({
   nome,
   operatoreId,
+  coloreOperatore: coloreOp,
   data,
   slots,
   passo,
@@ -460,6 +766,7 @@ function ColonnaOperatore({
   mappaClienti,
   onSlotTap,
   onAppuntamentoTap,
+  scambioEvidenzaId,
 }: ColonnaProps) {
   const nomeServizio = (id?: string) => servizi.find((s) => s.id === id)?.nome ?? ''
 
@@ -500,10 +807,11 @@ function ColonnaOperatore({
               key={a.id}
               type="button"
               data-app-id={a.id}
-              className={`app-blocco stato-${stato}${inAttesa ? ' in-attesa' : ''}${breve ? ' app-blocco-breve' : ''}`}
+              className={`app-blocco stato-${stato}${inAttesa ? ' in-attesa' : ''}${breve ? ' app-blocco-breve' : ''}${scambioEvidenzaId === a.id ? ' scambio-origine' : ''}${scambioEvidenzaId && scambioEvidenzaId !== a.id ? ' scambio-bersaglio' : ''}${a.serieId ? ' app-blocco-serie' : ''}`}
               style={{
                 top: `${top}%`,
                 height: `${height}%`,
+                borderLeftColor: coloreOp,
               }}
               onClick={(e) => {
                 e.stopPropagation()
@@ -519,6 +827,11 @@ function ColonnaOperatore({
                   {servizioNome ? <span className="app-blocco-servizio">{servizioNome}</span> : null}
                 </>
               )}
+              {a.serieId ? (
+                <span className="app-blocco-serie-mark" aria-hidden title="Appuntamento fisso">
+                  ↻
+                </span>
+              ) : null}
               {a.stato === 'confermato' ? (
                 <span className="app-blocco-spunta" aria-hidden>
                   ✓

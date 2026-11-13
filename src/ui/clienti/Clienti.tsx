@@ -14,6 +14,7 @@ import {
   tuttiIClienti,
 } from '../../core'
 import { formattaDataLunga } from '../utils/dateUi'
+import { InviaRiepilogoCliente } from '../components/InviaRiepilogoCliente'
 import './Clienti.css'
 
 export function Clienti() {
@@ -147,6 +148,8 @@ function SchedaCliente({
       <button type="button" className="btn-salva-cliente" onClick={() => void salva()}>
         Salva
       </button>
+
+      <InviaRiepilogoCliente clienteId={cliente.id} />
 
       {debitiAperti.length > 0 ? (
         <section className="cliente-debiti">

@@ -1,9 +1,19 @@
 import 'fake-indexeddb/auto'
+import Dexie from 'dexie'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   appuntamentiDelGiorno,
+  appuntamentiTra,
+  blocchiDelGiorno,
+  blocchiTra,
+  anteprimaSerie,
+  appuntamentiSerie,
   caricaDatiDemo,
+  creaSerie,
   cercaAppuntamenti,
+  eliminaSerieDa,
+  ripristinaAppuntamenti,
+  spostaSerieDa,
   cercaClienti,
   db,
   debitiAperti,
@@ -25,6 +35,9 @@ import {
   salvaImpostazioni,
   segnaDaPagare,
   segnaPagato,
+  riepilogoCliente,
+  scambiaAppuntamenti,
+  settimanaDi,
   spostaAppuntamento,
   svuotaTutto,
   totaleDaPagare,
@@ -64,6 +77,10 @@ describe('trovaOCreaCliente', () => {
     const b = await trovaOCreaCliente('Nicolò Verdi', '+39 3331234567')
     expect(b.id).toBe(a.id)
     expect(b.telefono).toBe('393331234567')
+  })
+
+  it('rifiuta telefoni non normalizzabili', async () => {
+    await expect(trovaOCreaCliente('Mario', '123')).rejects.toThrow('Telefono non valido')
   })
 })
 
@@ -133,9 +150,64 @@ describe('verificaAppuntamento', () => {
     })
     expect(avvisi.some((a) => a.tipo === 'sovrapposizione')).toBe(false)
   })
+
+  it('segnala impegno sovrapposto con messaggio dedicato', async () => {
+    await salvaBlocco({
+      id: crypto.randomUUID(),
+      operatoreId: null,
+      data: dataAperta,
+      dalle: '10:00',
+      alle: '11:00',
+      motivo: 'Fornitore',
+      tipo: 'impegno',
+    })
+    const avvisi = await verificaAppuntamento({
+      data: dataAperta,
+      ora: '10:15',
+      durataMin: 30,
+      operatoreId: op1,
+    })
+    const impegno = avvisi.find((a) => a.tipo === 'assenza')
+    expect(impegno?.messaggio).toBe("C'è un impegno in questo orario: Fornitore")
+  })
+
+  it('lunedì chiuso: avviso giorno_chiuso ma si può salvare', async () => {
+    const avvisi = await verificaAppuntamento({
+      data: '2026-11-16',
+      ora: '10:00',
+      durataMin: 30,
+      operatoreId: op1,
+    })
+    expect(avvisi.some((a) => a.tipo === 'giorno_chiuso')).toBe(true)
+    const { appuntamento } = await salvaAppuntamento(
+      app({ data: '2026-11-16', ora: '10:00', durataMin: 30, operatoreId: op1 }),
+    )
+    expect(appuntamento.data).toBe('2026-11-16')
+  })
+})
+
+describe('appuntamentiTra e blocchiTra', () => {
+  it('restituiscono i record nell’intervallo incluso', async () => {
+    await salvaAppuntamento(app({ data: '2026-11-17', ora: '09:00', durataMin: 30, operatoreId: op1 }))
+    await salvaAppuntamento(app({ data: '2026-11-18', ora: '10:00', durataMin: 30, operatoreId: op1 }))
+    await salvaBlocco({ id: crypto.randomUUID(), operatoreId: null, data: '2026-11-17', tipo: 'impegno', motivo: 'X' })
+    const apps = await appuntamentiTra('2026-11-17', '2026-11-17')
+    expect(apps).toHaveLength(1)
+    const blocchi = await blocchiTra('2026-11-17', '2026-11-18')
+    expect(blocchi).toHaveLength(1)
+  })
 })
 
 describe('salvaAppuntamento', () => {
+  it('rifiuta un id che non esiste nel database', async () => {
+    await expect(
+      salvaAppuntamento({
+        ...app({ ora: '10:00', durataMin: 30, operatoreId: op1 }),
+        id: '00000000-0000-4000-8000-000000000099',
+      }),
+    ).rejects.toThrow('Appuntamento non trovato')
+  })
+
   it('salva anche quando ci sono avvisi', async () => {
     await salvaAppuntamento(app({ ora: '10:00', durataMin: 30, operatoreId: op1 }))
     const { appuntamento, avvisi } = await salvaAppuntamento(
@@ -348,6 +420,13 @@ describe('debiti', () => {
     expect((await debitiAperti()).map((d) => d.debito.id)).toContain(debito.id)
   })
 
+  it('debitiAperti con cliente mancante mostra Cliente rimosso', async () => {
+    await segnaDaPagare({ clienteId: 'cliente-cancellato', importoCent: 1200, data: dataAperta })
+    const aperti = await debitiAperti()
+    expect(aperti).toHaveLength(1)
+    expect(aperti[0].cliente.nome).toBe('Cliente rimosso')
+  })
+
   it('debitiAperti è ordinato dal più vecchio e include il cliente giusto', async () => {
     const mario = await clienteDemo('c1', 'Mario', '393330000001')
     const luigi = await clienteDemo('c2', 'Luigi', '393330000002')
@@ -408,6 +487,8 @@ describe('backup', () => {
       nomeNegozio: 'Demo Modificata',
       ultimoBackupIl: '2026-11-01T10:00:00.000Z',
       squadra: impostazioniNegozio.squadra,
+      messaggiRapidi: impostazioniNegozio.messaggiRapidi,
+      testoRiepilogo: impostazioniNegozio.testoRiepilogo,
     }
     await salvaImpostazioni(impConTutto)
 
@@ -423,7 +504,6 @@ describe('backup', () => {
 
     await salvaAppuntamento(
       app({
-        id: 'a-note',
         clienteId: cliente.id,
         operatoreId: op1,
         ora: '10:00',
@@ -491,6 +571,24 @@ describe('backup', () => {
     await expect(importaBackup(blob)).rejects.toThrow('Versione backup non supportata')
   })
 
+  it('non modifica i dati se la validazione fallisce', async () => {
+    const cliente = await clienteDemo('c-backup', 'Paolo', '393330000010')
+    const blobJson = new Blob(['{ non-json'])
+    await expect(importaBackup(blobJson)).rejects.toThrow('Il file non è un JSON valido')
+    expect((await db.clienti.toArray()).map((c) => c.id)).toContain(cliente.id)
+
+    const blobSchema = new Blob([
+      JSON.stringify({
+        versione: 1,
+        clienti: [{ id: 'x', nome: 'Senza telefono' }],
+        appuntamenti: [],
+        blocchi: [],
+      }),
+    ])
+    await expect(importaBackup(blobSchema)).rejects.toThrow(/Cliente/)
+    expect((await db.clienti.toArray()).map((c) => c.id)).toContain(cliente.id)
+  })
+
   it('accetta backup senza debiti lasciando la tabella vuota', async () => {
     const blob = new Blob([JSON.stringify({ versione: 1, clienti: [], appuntamenti: [], blocchi: [] })])
     await importaBackup(blob)
@@ -515,6 +613,290 @@ describe('demoAttiva', () => {
   })
 })
 
+describe('serie appuntamenti', () => {
+  it('creaSerie assegna lo stesso serieId e anteprimaSegnala avvisi', async () => {
+    await trovaOCreaCliente('Serie Cliente', '333 000 0999')
+    const imp = await leggiImpostazioni()
+    const creati = await creaSerie(
+      {
+        ora: '10:00',
+        durataMin: 30,
+        operatoreId: imp.operatori[0]!.id,
+        clienteId: (await cercaClienti('Serie'))[0]!.id,
+        stato: 'prenotato',
+        promemoria: 'da_inviare',
+      },
+      [
+        { data: '2026-11-17', ora: '10:00' },
+        { data: '2026-11-24', ora: '10:00' },
+      ],
+    )
+    expect(creati).toHaveLength(2)
+    expect(creati[0]!.serieId).toBe(creati[1]!.serieId)
+    const serie = await appuntamentiSerie(creati[0]!.serieId!)
+    expect(serie).toHaveLength(2)
+
+    const anteprima = await anteprimaSerie(
+      { ora: '10:00', durataMin: 30, operatoreId: imp.operatori[0]!.id },
+      ['2026-11-16', '2026-11-17'],
+    )
+    expect(anteprima[0]!.avvisi.some((a) => a.tipo === 'giorno_chiuso')).toBe(true)
+  })
+
+  it('spostaSerieDa e eliminaSerieDa restituiscono lo stato per Annulla', async () => {
+    await trovaOCreaCliente('Ripeti', '333 000 0888')
+    const imp = await leggiImpostazioni()
+    const op = imp.operatori[0]!.id
+    const clienteId = (await cercaClienti('Ripeti'))[0]!.id
+    const creati = await creaSerie(
+      {
+        ora: '09:00',
+        durataMin: 30,
+        operatoreId: op,
+        clienteId,
+        stato: 'prenotato',
+        promemoria: 'da_inviare',
+      },
+      [
+        { data: '2026-11-17', ora: '09:00' },
+        { data: '2026-11-18', ora: '09:00' },
+        { data: '2026-11-19', ora: '09:00' },
+      ],
+    )
+    const medio = creati[1]!
+    const primaSposta = await spostaSerieDa(medio.id, '11:30', op)
+    expect(primaSposta).toHaveLength(2)
+    await ripristinaAppuntamenti(primaSposta)
+
+    const primaElimina = await eliminaSerieDa(medio.id)
+    expect(primaElimina.length).toBeGreaterThanOrEqual(2)
+    await ripristinaAppuntamenti(primaElimina)
+    expect((await appuntamentiSerie(creati[0]!.serieId!)).length).toBe(3)
+  })
+})
+
+describe('upgrade IndexedDB', () => {
+  it('dalla versione 1 mantiene clienti e appuntamenti aggiungendo debiti', async () => {
+    await db.close()
+    await db.delete()
+
+    const soloV1 = new Dexie('barbiere') as Dexie & {
+      clienti: Dexie.Table<Cliente, string>
+      appuntamenti: Dexie.Table<Appuntamento, string>
+    }
+    soloV1.version(1).stores({
+      clienti: 'id, &telefono, nome, aggiornatoIl',
+      appuntamenti: 'id, data, operatoreId, clienteId, stato, aggiornatoIl',
+      blocchi: 'id, data, operatoreId',
+      impostazioni: 'id',
+    })
+    await soloV1.open()
+    const cliente: Cliente = {
+      id: 'v1-cliente',
+      nome: 'Cliente V1',
+      telefono: '393330000088',
+      creatoIl: new Date().toISOString(),
+      aggiornatoIl: new Date().toISOString(),
+    }
+    const appuntamento: Appuntamento = {
+      id: 'v1-app',
+      data: dataAperta,
+      ora: '09:00',
+      durataMin: 30,
+      operatoreId: op1,
+      clienteId: cliente.id,
+      stato: 'prenotato',
+      promemoria: 'da_inviare',
+      creatoIl: new Date().toISOString(),
+      aggiornatoIl: new Date().toISOString(),
+    }
+    await soloV1.clienti.add(cliente)
+    await soloV1.appuntamenti.add(appuntamento)
+    await soloV1.close()
+
+    await db.open()
+    expect(await db.clienti.toArray()).toEqual([cliente])
+    expect(await db.appuntamenti.toArray()).toEqual([appuntamento])
+    expect(await db.debiti.toArray()).toEqual([])
+  })
+
+  it('dalla versione 2 mantiene appuntamenti aggiungendo indice serieId', async () => {
+    await db.close()
+    await db.delete()
+
+    const soloV2 = new Dexie('barbiere') as Dexie & {
+      clienti: Dexie.Table<Cliente, string>
+      appuntamenti: Dexie.Table<Appuntamento, string>
+      debiti: Dexie.Table<{ id: string }, string>
+    }
+    soloV2.version(1).stores({
+      clienti: 'id, &telefono, nome, aggiornatoIl',
+      appuntamenti: 'id, data, operatoreId, clienteId, stato, aggiornatoIl',
+      blocchi: 'id, data, operatoreId',
+      impostazioni: 'id',
+    })
+    soloV2.version(2).stores({ debiti: 'id, clienteId, pagatoIl, data' })
+    await soloV2.open()
+    const appuntamento: Appuntamento = {
+      id: 'v2-serie',
+      data: dataAperta,
+      ora: '09:00',
+      durataMin: 30,
+      operatoreId: op1,
+      clienteId: 'c-x',
+      stato: 'prenotato',
+      promemoria: 'da_inviare',
+      creatoIl: new Date().toISOString(),
+      aggiornatoIl: new Date().toISOString(),
+    }
+    await soloV2.appuntamenti.add(appuntamento)
+    await soloV2.close()
+
+    await db.open()
+    expect(await db.appuntamenti.get('v2-serie')).toEqual(appuntamento)
+  })
+})
+
+describe('scambiaAppuntamenti', () => {
+  it('scambia data, ora e operatore tra due appuntamenti', async () => {
+    const { appuntamento: a1 } = await salvaAppuntamento(
+      app({ ora: '09:00', durataMin: 30, operatoreId: op1, data: '2026-11-17' }),
+    )
+    const { appuntamento: a2 } = await salvaAppuntamento(
+      app({ ora: '11:00', durataMin: 20, operatoreId: op2, data: '2026-11-18' }),
+    )
+    const { a, b } = await scambiaAppuntamenti(a1.id, a2.id)
+    expect(a.data).toBe('2026-11-18')
+    expect(a.ora).toBe('11:00')
+    expect(a.operatoreId).toBe(op2)
+    expect(a.durataMin).toBe(30)
+    expect(b.data).toBe('2026-11-17')
+    expect(b.ora).toBe('09:00')
+    expect(b.operatoreId).toBe(op1)
+    expect(b.durataMin).toBe(20)
+  })
+
+  it('riporta il promemoria a da_inviare solo a chi cambia giorno', async () => {
+    const { appuntamento: a1 } = await salvaAppuntamento(
+      app({
+        ora: '09:00',
+        durataMin: 30,
+        operatoreId: op1,
+        data: '2026-11-17',
+        promemoria: 'inviato',
+      }),
+    )
+    const { appuntamento: a2 } = await salvaAppuntamento(
+      app({
+        ora: '10:00',
+        durataMin: 30,
+        operatoreId: op1,
+        data: '2026-11-17',
+        promemoria: 'inviato',
+      }),
+    )
+    const { a, b } = await scambiaAppuntamenti(a1.id, a2.id)
+    expect(a.promemoria).toBe('inviato')
+    expect(b.promemoria).toBe('inviato')
+
+    const { appuntamento: x1 } = await salvaAppuntamento(
+      app({
+        ora: '09:00',
+        durataMin: 30,
+        operatoreId: op1,
+        data: '2026-11-17',
+        promemoria: 'inviato',
+      }),
+    )
+    const { appuntamento: x2 } = await salvaAppuntamento(
+      app({
+        ora: '10:00',
+        durataMin: 30,
+        operatoreId: op1,
+        data: '2026-11-18',
+        promemoria: 'inviato',
+      }),
+    )
+    const ris = await scambiaAppuntamenti(x1.id, x2.id)
+    expect(ris.a.promemoria).toBe('da_inviare')
+    expect(ris.b.promemoria).toBe('da_inviare')
+  })
+
+  it('un secondo scambio con gli stessi id annulla il primo', async () => {
+    const { appuntamento: a1 } = await salvaAppuntamento(
+      app({ ora: '09:00', durataMin: 30, operatoreId: op1 }),
+    )
+    const { appuntamento: a2 } = await salvaAppuntamento(
+      app({ ora: '11:00', durataMin: 30, operatoreId: op2 }),
+    )
+    await scambiaAppuntamenti(a1.id, a2.id)
+    const { a, b } = await scambiaAppuntamenti(a1.id, a2.id)
+    expect(a.ora).toBe('09:00')
+    expect(a.operatoreId).toBe(op1)
+    expect(b.ora).toBe('11:00')
+    expect(b.operatoreId).toBe(op2)
+  })
+
+  it('può produrre avvisi di sovrapposizione senza bloccare', async () => {
+    const { appuntamento: b } = await salvaAppuntamento(
+      app({ ora: '11:00', durataMin: 30, operatoreId: op1 }),
+    )
+    const { appuntamento: c } = await salvaAppuntamento(
+      app({ ora: '11:15', durataMin: 30, operatoreId: op1 }),
+    )
+    const { avvisi } = await scambiaAppuntamenti(b.id, c.id)
+    expect(avvisi.some((x) => x.tipo === 'sovrapposizione')).toBe(true)
+  })
+
+  it('rifiuta id uguali o inesistenti', async () => {
+    const { appuntamento } = await salvaAppuntamento(app({ ora: '10:00', durataMin: 30, operatoreId: op1 }))
+    await expect(scambiaAppuntamenti(appuntamento.id, appuntamento.id)).rejects.toThrow()
+    await expect(
+      scambiaAppuntamenti(appuntamento.id, '00000000-0000-4000-8000-000000000099'),
+    ).rejects.toThrow('Appuntamento non trovato')
+  })
+})
+
+describe('riepilogoCliente', () => {
+  it('compone elenco e link identico al testo', async () => {
+    const cliente: Cliente = {
+      id: 'rc1',
+      nome: 'Cliente Riepilogo',
+      telefono: '393330000099',
+      creatoIl: new Date().toISOString(),
+      aggiornatoIl: new Date().toISOString(),
+    }
+    await salvaCliente(cliente)
+    await salvaAppuntamento(
+      app({ clienteId: cliente.id, ora: '09:00', durataMin: 30, operatoreId: op1, data: '2026-11-17' }),
+    )
+    await salvaAppuntamento(
+      app({ clienteId: cliente.id, ora: '15:00', durataMin: 30, operatoreId: op1, data: '2026-11-19' }),
+    )
+    await salvaAppuntamento(
+      app({
+        clienteId: cliente.id,
+        ora: '08:00',
+        durataMin: 30,
+        operatoreId: op1,
+        data: '2026-11-16',
+        stato: 'disdetto',
+      }),
+    )
+    await salvaImpostazioni({
+      ...impDemo,
+      testoRiepilogo: 'Ciao {nome}\n{elenco}',
+    })
+
+    const r = await riepilogoCliente(cliente.id, '2026-11-14')
+    expect(r.appuntamenti).toHaveLength(2)
+    expect(r.appuntamenti[0].data).toBe('2026-11-17')
+    expect(r.testo).toContain('•')
+    expect(r.testo).toContain('9.00')
+    expect(new URL(r.link).searchParams.get('text')).toBe(r.testo)
+  })
+})
+
 describe('leggiImpostazioni frasi', () => {
   it('riempie frasi dal negozio se mancano nelle impostazioni salvate', async () => {
     const senzaFrasi: Impostazioni = {
@@ -528,6 +910,18 @@ describe('leggiImpostazioni frasi', () => {
     expect(imp.nomeNegozio).toBe('Salvato')
     expect(imp.frasi).toEqual(impostazioniNegozio.frasi)
     expect(imp.frasi?.mattina?.[0]).toContain('friend')
+  })
+})
+
+describe('leggiImpostazioni messaggiRapidi', () => {
+  it('riempie messaggiRapidi e testoRiepilogo dal negozio se mancano', async () => {
+    const parziale: Impostazioni = { ...impDemo, nomeNegozio: 'Con messaggi' }
+    delete parziale.messaggiRapidi
+    delete parziale.testoRiepilogo
+    await salvaImpostazioni(parziale)
+    const imp = await leggiImpostazioni()
+    expect(imp.messaggiRapidi?.[0]?.etichetta).toBe('Sii puntuale')
+    expect(imp.testoRiepilogo).toContain('{elenco}')
   })
 })
 
@@ -573,6 +967,25 @@ describe('caricaDatiDemo', () => {
     for (const c of clienti) {
       expect(nomiOperatori.has(c.nome)).toBe(false)
     }
+  })
+
+  it('include una serie inventata ogni 2 settimane per 4 volte', async () => {
+    await caricaDatiDemo()
+    const conSerie = (await db.appuntamenti.toArray()).filter((a) => a.serieId)
+    expect(conSerie.length).toBe(4)
+    const ids = new Set(conSerie.map((a) => a.serieId))
+    expect(ids.size).toBe(1)
+  })
+
+  it('include un impegno inventato di lunedì', async () => {
+    await caricaDatiDemo()
+    const imp = await leggiImpostazioni()
+    const prossimo = prossimoGiornoApertura(oggi(), imp, [])
+    const lunedi = settimanaDi(prossimo)[0]!
+    const apps = await appuntamentiDelGiorno(prossimo)
+    expect(apps.length).toBeGreaterThan(0)
+    const blocchi = await blocchiDelGiorno(lunedi)
+    expect(blocchi.some((b) => b.tipo === 'impegno' && b.motivo === 'Corso fornitori')).toBe(true)
   })
 
   it('aggiunge 2 debiti aperti su 2 clienti diversi e svuotaTutto li cancella', async () => {

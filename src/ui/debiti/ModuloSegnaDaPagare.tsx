@@ -72,7 +72,13 @@ export const ModuloSegnaDaPagare = forwardRef<ModuloSegnaDaPagareHandle, Props>(
         setErrore('Nome e telefono validi richiesti')
         return
       }
-      const c = await trovaOCreaCliente(nomeNuovo.trim(), telNuovo)
+      let c
+      try {
+        c = await trovaOCreaCliente(nomeNuovo.trim(), telNuovo)
+      } catch {
+        setErrore('Telefono non valido')
+        return
+      }
       setClienteSel(c)
       setQueryCliente(c.nome)
       setMostraNuovo(false)

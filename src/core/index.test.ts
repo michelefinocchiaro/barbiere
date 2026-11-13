@@ -1,16 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import {
+  componiMessaggioRapido,
   componiPromemoria,
   formattaEuro,
   formattaOra,
   formattaTelefono,
+  giornoEsteso,
   leggiEuro,
   linkWhatsApp,
   normalizzaTelefono,
   oggi,
+  giornoAperto,
+  intervalloOccupato,
   prossimoGiornoApertura,
   quando,
+  settimanaDi,
+  sommaMinuti,
 } from './index.ts'
+import type { Appuntamento, Cliente, MessaggioRapido } from './tipi.ts'
 import { impostazioni as impostazioniNegozio } from '../negozi/index.ts'
 import type { Blocco, Impostazioni } from './tipi.ts'
 
@@ -83,6 +90,17 @@ describe('leggiEuro', () => {
     expect(leggiEuro('-5')).toBeNull()
     expect(leggiEuro('15,555')).toBeNull()
   })
+
+  it('legge gli importi formattati con migliaia e fa andata e ritorno con formattaEuro', () => {
+    const casi = [1, 99, 100000, 1234550]
+    for (const cent of casi) {
+      const testo = formattaEuro(cent).replace(' €', '')
+      expect(leggiEuro(testo)).toBe(cent)
+    }
+    expect(leggiEuro('1.000,00')).toBe(100000)
+    expect(leggiEuro('12.345,50')).toBe(1234550)
+    expect(leggiEuro('12.5')).toBe(1250)
+  })
 })
 
 describe('quando', () => {
@@ -93,6 +111,65 @@ describe('quando', () => {
     expect(quando('2026-11-15', oggiStr)).toBe('domani')
     expect(quando('2026-11-17', oggiStr)).toBe('martedì')
     expect(quando('2026-11-24', oggiStr)).toBe('martedì 24 novembre')
+  })
+})
+
+describe('settimanaDi', () => {
+  it('restituisce sette giorni da lunedì a domenica', () => {
+    expect(settimanaDi('2026-11-14')).toEqual([
+      '2026-11-09',
+      '2026-11-10',
+      '2026-11-11',
+      '2026-11-12',
+      '2026-11-13',
+      '2026-11-14',
+      '2026-11-15',
+    ])
+  })
+})
+
+describe('giornoAperto', () => {
+  it('lunedì e domenica chiusi per il negozio demo', () => {
+    expect(giornoAperto('2026-11-16', imp, [])).toBe(false)
+    expect(giornoAperto('2026-11-17', imp, [])).toBe(true)
+  })
+
+  it('un impegno di giornata intera non chiude il negozio', () => {
+    const blocchi: Blocco[] = [
+      { id: '1', operatoreId: null, data: '2026-11-17', motivo: 'Corso', tipo: 'impegno' },
+    ]
+    expect(giornoAperto('2026-11-17', imp, blocchi)).toBe(true)
+  })
+
+  it('blocco assenza tutto il negozio chiude quel giorno', () => {
+    const blocchi: Blocco[] = [{ id: '1', operatoreId: null, data: '2026-11-17' }]
+    expect(giornoAperto('2026-11-17', imp, blocchi)).toBe(false)
+  })
+})
+
+describe('intervalloOccupato', () => {
+  const apps: Appuntamento[] = []
+
+  it('impegno con orario occupa lo slot', () => {
+    const blocchi: Blocco[] = [
+      {
+        id: 'i1',
+        operatoreId: null,
+        data: '2026-11-17',
+        dalle: '10:00',
+        alle: '11:00',
+        tipo: 'impegno',
+        motivo: 'Corso',
+      },
+    ]
+    expect(intervalloOccupato('op1', 10 * 60, 10 * 60 + 30, apps, blocchi)).toBe(true)
+  })
+
+  it('impegno tutto il giorno non occupa gli slot orari', () => {
+    const blocchi: Blocco[] = [
+      { id: 'i2', operatoreId: null, data: '2026-11-17', tipo: 'impegno', motivo: 'Fiera' },
+    ]
+    expect(intervalloOccupato('op1', 10 * 60, 10 * 60 + 30, apps, blocchi)).toBe(false)
   })
 })
 
@@ -112,6 +189,13 @@ describe('prossimoGiornoApertura', () => {
 
   it('non salta un blocco di un solo operatore', () => {
     const blocchi: Blocco[] = [{ id: '1', operatoreId: 'op1', data: '2026-11-17' }]
+    expect(prossimoGiornoApertura('2026-11-14', imp, blocchi)).toBe('2026-11-17')
+  })
+
+  it('ignora un impegno a giornata intera', () => {
+    const blocchi: Blocco[] = [
+      { id: '1', operatoreId: null, data: '2026-11-17', motivo: 'Fornitore', tipo: 'impegno' },
+    ]
     expect(prossimoGiornoApertura('2026-11-14', imp, blocchi)).toBe('2026-11-17')
   })
 })
@@ -165,5 +249,51 @@ describe('testo promemoria standard', () => {
 describe('oggi', () => {
   it('restituisce una data ISO', () => {
     expect(oggi()).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+})
+
+describe('sommaMinuti', () => {
+  it('somma i minuti e non supera 23:59', () => {
+    expect(sommaMinuti('08:50', 10)).toBe('09:00')
+    expect(sommaMinuti('23:50', 30)).toBe('23:59')
+  })
+})
+
+describe('giornoEsteso', () => {
+  it('formatta giorno, numero e mese in italiano', () => {
+    expect(giornoEsteso('2026-11-17')).toMatch(/martedì\s+17\s+novembre/i)
+  })
+})
+
+describe('componiMessaggioRapido', () => {
+  const cliente: Cliente = {
+    id: 'c1',
+    nome: 'Cliente Demo',
+    telefono: '393330000001',
+    creatoIl: '',
+    aggiornatoIl: '',
+  }
+  const appuntamento: Appuntamento = {
+    id: 'a1',
+    data: '2026-11-17',
+    ora: '10:00',
+    durataMin: 30,
+    operatoreId: 'op1',
+    clienteId: 'c1',
+    stato: 'prenotato',
+    promemoria: 'da_inviare',
+    creatoIl: '',
+    aggiornatoIl: '',
+  }
+
+  it('sostituisce i segnaposto incluso ora_dopo con ritardo', () => {
+    const m: MessaggioRapido = {
+      id: 'ritardo',
+      etichetta: 'Ritarda',
+      ritardoMin: 10,
+      testo: 'Alle {ora} o {ora_dopo} per {nome}',
+    }
+    const testo = componiMessaggioRapido(m, appuntamento, cliente, '2026-11-14')
+    expect(testo).toBe('Alle 10.00 o 10.10 per Cliente Demo')
   })
 })

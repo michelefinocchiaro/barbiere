@@ -1,7 +1,7 @@
 # Agenda e promemoria WhatsApp per barbieri
 
 PWA per il tablet del negozio: agenda per operatore e promemoria del giorno prima su WhatsApp,
-inviati con un tocco per cliente tramite link `wa.me` (zero costi, nessun rischio di ban: il
+inviati con un tocco per cliente tramite link `api.whatsapp.com` (zero costi, nessun rischio di ban: il
 messaggio lo invia la persona, dal WhatsApp del negozio). Nessun backend: i dati restano nel
 browser del tablet (IndexedDB), con backup esportabile.
 

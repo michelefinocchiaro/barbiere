@@ -12,14 +12,20 @@ import type {
   HHMM,
   Impostazioni,
   ISODate,
+  MessaggioRapido,
   Riepilogo,
+  RiepilogoCliente,
   RigaDebito,
   RigaPromemoria,
   RisultatoRicerca,
   StatoAppuntamento,
   TotaleDaPagare,
+  VoceSerie,
 } from './tipi.ts'
 import { FRASI_PREDEFINITE, fraseDelMomento, momentoDellaGiornata } from './frasi.ts'
+import { datePerSerie } from './serie.ts'
+
+export { datePerSerie }
 
 export type {
   Appuntamento,
@@ -33,16 +39,20 @@ export type {
   Impostazioni,
   ISODate,
   MembroSquadra,
+  MessaggioRapido,
   MomentoFrase,
   Operatore,
   Riepilogo,
+  RiepilogoCliente,
   RigaDebito,
   RigaPromemoria,
   RisultatoRicerca,
   Servizio,
+  RegolaSerie,
   StatoAppuntamento,
   TipoAvviso,
   TotaleDaPagare,
+  VoceSerie,
 } from './tipi.ts'
 
 export { FRASI_PREDEFINITE, fraseDelMomento, momentoDellaGiornata }
@@ -67,6 +77,10 @@ db.version(2).stores({
   debiti: 'id, clienteId, pagatoIl, data',
 })
 
+db.version(3).stores({
+  appuntamenti: 'id, data, operatoreId, clienteId, stato, serieId, aggiornatoIl',
+})
+
 // Helper
 function localDateFromISODate(iso: ISODate): Date {
   const [y, m, d] = iso.split('-').map(Number)
@@ -87,11 +101,92 @@ function hhmmToMinuti(ora: HHMM): number {
   return h * 60 + m
 }
 
+/** Blocco di chiusura tutto il negozio per la giornata (esclude impegni). */
+export function bloccoChiudeNegozioIntera(b: Blocco): boolean {
+  if (b.tipo === 'impegno') return false
+  return b.operatoreId === null && b.dalle === undefined && b.alle === undefined
+}
+
+export function giornoAperto(data: ISODate, imp: Impostazioni, blocchi: Blocco[]): boolean {
+  const giorno = localDateFromISODate(data).getDay()
+  if (!imp.giorniApertura.includes(giorno)) return false
+  return !blocchi.some((b) => b.data === data && bloccoChiudeNegozioIntera(b))
+}
+
+export function settimanaDi(data: ISODate): ISODate[] {
+  const d = localDateFromISODate(data)
+  const dow = d.getDay()
+  const offset = dow === 0 ? -6 : 1 - dow
+  d.setDate(d.getDate() + offset)
+  const lunedi = d.getTime()
+  const out: ISODate[] = []
+  for (let i = 0; i < 7; i++) {
+    const g = new Date(lunedi)
+    g.setDate(g.getDate() + i)
+    out.push(toISODate(g))
+  }
+  return out
+}
+
 function normalizzaRicerca(s: string): string {
   return s
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+}
+
+export function intervalliSiSovrappongono(
+  inizio: number,
+  fine: number,
+  aInizio: number,
+  aFine: number,
+): boolean {
+  return fine > aInizio && inizio < aFine
+}
+
+/** True se l'intervallo [inizioMin, fineMin) collide con blocchi o appuntamenti (esclusi i disdetti). */
+export function intervalloOccupato(
+  operatoreId: string,
+  inizioMin: number,
+  fineMin: number,
+  appuntamenti: Pick<Appuntamento, 'id' | 'ora' | 'durataMin' | 'operatoreId' | 'stato'>[],
+  blocchi: Blocco[],
+  escludiAppuntamentoId?: string,
+): boolean {
+  for (const b of blocchi) {
+    if (b.tipo === 'impegno' && b.dalle === undefined && b.alle === undefined) continue
+    if (b.operatoreId !== null && b.operatoreId !== operatoreId) continue
+    const bloccoInizio = b.dalle ? hhmmToMinuti(b.dalle) : 0
+    const bloccoFine = b.alle ? hhmmToMinuti(b.alle) : 24 * 60
+    if (intervalliSiSovrappongono(inizioMin, fineMin, bloccoInizio, bloccoFine)) return true
+  }
+  for (const a of appuntamenti) {
+    if (a.operatoreId !== operatoreId || a.stato === 'disdetto') continue
+    if (escludiAppuntamentoId && a.id === escludiAppuntamentoId) continue
+    const aInizio = hhmmToMinuti(a.ora)
+    const aFine = aInizio + a.durataMin
+    if (intervalliSiSovrappongono(inizioMin, fineMin, aInizio, aFine)) return true
+  }
+  return false
+}
+
+export function slotLibero(
+  operatoreId: string,
+  ora: HHMM,
+  durataMin: number,
+  appuntamenti: Pick<Appuntamento, 'id' | 'ora' | 'durataMin' | 'operatoreId' | 'stato'>[],
+  blocchi: Blocco[],
+  escludiAppuntamentoId?: string,
+): boolean {
+  const inizio = hhmmToMinuti(ora)
+  return !intervalloOccupato(
+    operatoreId,
+    inizio,
+    inizio + durataMin,
+    appuntamenti,
+    blocchi,
+    escludiAppuntamentoId,
+  )
 }
 
 async function calcolaAvvisi(
@@ -115,19 +210,24 @@ async function calcolaAvvisi(
     avvisi.push({ tipo: 'fuori_orario', messaggio: `L'orario è fuori dall'apertura (${imp.apre}-${imp.chiude}).` })
   }
 
-  // Assenze
   const blocchi = await db.blocchi.where('data').equals(app.data).toArray()
   for (const b of blocchi) {
     if (b.operatoreId !== null && b.operatoreId !== app.operatoreId) continue
     const bloccoInizio = b.dalle ? hhmmToMinuti(b.dalle) : 0
     const bloccoFine = b.alle ? hhmmToMinuti(b.alle) : 24 * 60
-    if (fine > bloccoInizio && inizio < bloccoFine) {
-      const chi = b.operatoreId === null ? 'Il negozio' : "L'operatore"
-      avvisi.push({ tipo: 'assenza', messaggio: `${chi} è assente in questo orario.` })
+    if (intervalliSiSovrappongono(inizio, fine, bloccoInizio, bloccoFine)) {
+      if (b.tipo === 'impegno') {
+        avvisi.push({
+          tipo: 'assenza',
+          messaggio: `C'è un impegno in questo orario: ${b.motivo ?? ''}`,
+        })
+      } else {
+        const chi = b.operatoreId === null ? 'Il negozio' : "L'operatore"
+        avvisi.push({ tipo: 'assenza', messaggio: `${chi} è assente in questo orario.` })
+      }
     }
   }
 
-  // Sovrapposizioni
   if (app.stato !== 'disdetto') {
     const altri = await db.appuntamenti
       .where('data')
@@ -137,7 +237,7 @@ async function calcolaAvvisi(
     for (const a of altri) {
       const aInizio = hhmmToMinuti(a.ora)
       const aFine = aInizio + a.durataMin
-      if (fine > aInizio && inizio < aFine) {
+      if (intervalliSiSovrappongono(inizio, fine, aInizio, aFine)) {
         avvisi.push({
           tipo: 'sovrapposizione',
           messaggio: "L'appuntamento si sovrappone a un altro.",
@@ -212,14 +312,29 @@ export function leggiEuro(input: string): number | null {
   if (/[^\d,.]/.test(pulito)) return null
   if (pulito.includes('-')) return null
 
-  const virgole = (pulito.match(/,/g) ?? []).length
-  const punti = (pulito.match(/\./g) ?? []).length
-  if (virgole + punti > 1) return null
+  let interoStr: string
+  let decimaleStr: string
 
-  const separatore = virgole > 0 ? ',' : punti > 0 ? '.' : null
-  let [interoStr, decimaleStr = '00'] = separatore
-    ? pulito.split(separatore)
-    : [pulito, '00']
+  if (pulito.includes(',')) {
+    const parti = pulito.split(',')
+    if (parti.length > 2) return null
+    interoStr = parti[0].replace(/\./g, '')
+    decimaleStr = parti[1] ?? '00'
+  } else if (pulito.includes('.')) {
+    const parti = pulito.split('.')
+    if (parti.length === 2 && parti[1].length >= 1 && parti[1].length <= 2) {
+      interoStr = parti[0]
+      decimaleStr = parti[1]
+    } else if (parti.every((p) => /^\d+$/.test(p))) {
+      interoStr = parti.join('')
+      decimaleStr = '00'
+    } else {
+      return null
+    }
+  } else {
+    interoStr = pulito
+    decimaleStr = '00'
+  }
 
   if (interoStr === '') interoStr = '0'
   if (!/^\d+$/.test(interoStr)) return null
@@ -259,12 +374,42 @@ export function quando(dataAppuntamento: ISODate, oggi: ISODate): string {
   return fmtLunga.format(dApp)
 }
 
+export function sommaMinuti(ora: HHMM, minuti: number): HHMM {
+  const tot = Math.min(hhmmToMinuti(ora) + minuti, 23 * 60 + 59)
+  const h = Math.floor(tot / 60)
+  const m = tot % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+export function giornoEsteso(data: ISODate): string {
+  const d = localDateFromISODate(data)
+  return new Intl.DateTimeFormat('it-IT', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'Europe/Rome',
+  }).format(d)
+}
+
+export function componiMessaggioRapido(
+  m: MessaggioRapido,
+  a: Appuntamento,
+  c: Cliente,
+  oggiIso: ISODate,
+): string {
+  const ritardo = m.ritardoMin ?? 0
+  return componiPromemoria(m.testo, {
+    nome: c.nome,
+    ora: formattaOra(a.ora),
+    ora_dopo: formattaOra(sommaMinuti(a.ora, ritardo)),
+    quando: quando(a.data, oggiIso),
+  })
+}
+
 export function prossimoGiornoApertura(da: ISODate, imp: Impostazioni, blocchi: Blocco[]): ISODate {
   const giorni = new Set(imp.giorniApertura)
   const blocchiInteri = new Set(
-    blocchi
-      .filter((b) => b.operatoreId === null && b.dalle === undefined && b.alle === undefined)
-      .map((b) => b.data),
+    blocchi.filter((b) => bloccoChiudeNegozioIntera(b)).map((b) => b.data),
   )
   const data = localDateFromISODate(da)
   for (let i = 0; i < 366; i++) {
@@ -321,7 +466,8 @@ export async function cercaClienti(query: string, limite?: number): Promise<Clie
 }
 
 export async function trovaOCreaCliente(nome: string, telefono: string): Promise<Cliente> {
-  const norm = normalizzaTelefono(telefono) ?? telefono
+  const norm = normalizzaTelefono(telefono)
+  if (!norm) throw new Error('Telefono non valido')
   const esistente = await db.clienti.where('telefono').equals(norm).first()
   const now = new Date().toISOString()
   if (esistente) {
@@ -362,6 +508,11 @@ export async function appuntamentiDelGiorno(data: ISODate): Promise<Appuntamento
   return db.appuntamenti.where('data').equals(data).sortBy('ora')
 }
 
+export async function appuntamentiTra(da: ISODate, a: ISODate): Promise<Appuntamento[]> {
+  const rows = await db.appuntamenti.where('data').between(da, a, true, true).toArray()
+  return rows.sort((x, y) => `${x.data}T${x.ora}`.localeCompare(`${y.data}T${y.ora}`))
+}
+
 export async function salvaAppuntamento(
   a: Omit<Appuntamento, 'id' | 'creatoIl' | 'aggiornatoIl'> & { id?: string },
 ): Promise<{ appuntamento: Appuntamento; avvisi: Avviso[] }> {
@@ -369,7 +520,8 @@ export async function salvaAppuntamento(
   let app: Appuntamento
   if (a.id) {
     const esistente = await db.appuntamenti.get(a.id)
-    app = { ...(esistente ?? {}), ...a, aggiornatoIl: now } as Appuntamento
+    if (!esistente) throw new Error('Appuntamento non trovato')
+    app = { ...esistente, ...a, aggiornatoIl: now }
   } else {
     app = { ...a, id: crypto.randomUUID(), creatoIl: now, aggiornatoIl: now } as Appuntamento
   }
@@ -406,12 +558,194 @@ export async function spostaAppuntamento(
   return { appuntamento: aggiornato, avvisi }
 }
 
+export async function scambiaAppuntamenti(
+  idA: string,
+  idB: string,
+): Promise<{ a: Appuntamento; b: Appuntamento; avvisi: Avviso[] }> {
+  if (idA === idB) throw new Error('Non puoi scambiare un appuntamento con sé stesso')
+  const now = new Date().toISOString()
+  let aFinale!: Appuntamento
+  let bFinale!: Appuntamento
+
+  await db.transaction('rw', db.appuntamenti, async () => {
+    const a = await db.appuntamenti.get(idA)
+    const b = await db.appuntamenti.get(idB)
+    if (!a || !b) throw new Error('Appuntamento non trovato')
+
+    const aCambiaGiorno = a.data !== b.data
+    const bCambiaGiorno = b.data !== a.data
+
+    aFinale = {
+      ...a,
+      data: b.data,
+      ora: b.ora,
+      operatoreId: b.operatoreId,
+      promemoria: aCambiaGiorno ? 'da_inviare' : a.promemoria,
+      aggiornatoIl: now,
+    }
+    bFinale = {
+      ...b,
+      data: a.data,
+      ora: a.ora,
+      operatoreId: a.operatoreId,
+      promemoria: bCambiaGiorno ? 'da_inviare' : b.promemoria,
+      aggiornatoIl: now,
+    }
+    await db.appuntamenti.put(aFinale)
+    await db.appuntamenti.put(bFinale)
+  })
+
+  const avvisiA = await calcolaAvvisi(aFinale)
+  const avvisiB = await calcolaAvvisi(bFinale)
+  const avvisi = [...avvisiA, ...avvisiB]
+  return { a: aFinale, b: bFinale, avvisi }
+}
+
+export async function riepilogoCliente(clienteId: string, da?: ISODate): Promise<RiepilogoCliente> {
+  const dal = da ?? oggi()
+  const cliente = await db.clienti.get(clienteId)
+  if (!cliente) throw new Error('Cliente non trovato')
+
+  const appuntamenti = (
+    await db.appuntamenti
+      .where('clienteId')
+      .equals(clienteId)
+      .filter((a) => a.stato !== 'disdetto' && a.data >= dal)
+      .toArray()
+  ).sort((a, b) => {
+    const cmp = a.data.localeCompare(b.data)
+    return cmp !== 0 ? cmp : a.ora.localeCompare(b.ora)
+  })
+
+  const imp = await leggiImpostazioni()
+  const modello =
+    imp.testoRiepilogo ??
+    impostazioniDefault.testoRiepilogo ??
+    ''
+  const elenco = appuntamenti
+    .map((a) => `• ${giornoEsteso(a.data)} alle ${formattaOra(a.ora)}`)
+    .join('\n')
+  const testo = componiPromemoria(modello, { elenco })
+  const link = linkWhatsApp(cliente.telefono, testo)
+  return { cliente, appuntamenti, testo, link }
+}
+
 export async function impostaStato(id: string, stato: StatoAppuntamento): Promise<void> {
   await db.appuntamenti.update(id, { stato, aggiornatoIl: new Date().toISOString() })
 }
 
 export async function eliminaAppuntamento(id: string): Promise<void> {
   await db.appuntamenti.delete(id)
+}
+
+export async function anteprimaSerie(
+  base: Pick<Appuntamento, 'ora' | 'durataMin' | 'operatoreId'>,
+  date: ISODate[],
+): Promise<VoceSerie[]> {
+  const voci: VoceSerie[] = []
+  for (const data of date) {
+    const avvisi = await verificaAppuntamento({
+      data,
+      ora: base.ora,
+      durataMin: base.durataMin,
+      operatoreId: base.operatoreId,
+    })
+    voci.push({ data, ora: base.ora, avvisi })
+  }
+  return voci
+}
+
+export async function creaSerie(
+  base: Omit<Appuntamento, 'id' | 'creatoIl' | 'aggiornatoIl' | 'data' | 'serieId'>,
+  voci: { data: ISODate; ora: HHMM }[],
+): Promise<Appuntamento[]> {
+  if (voci.length === 0) return []
+  const serieId = crypto.randomUUID()
+  const now = new Date().toISOString()
+  const creati: Appuntamento[] = voci.map((v) => ({
+    ...base,
+    id: crypto.randomUUID(),
+    data: v.data,
+    ora: v.ora,
+    serieId,
+    promemoria: base.promemoria ?? 'da_inviare',
+    creatoIl: now,
+    aggiornatoIl: now,
+  }))
+  await db.transaction('rw', db.appuntamenti, async () => {
+    await db.appuntamenti.bulkAdd(creati)
+  })
+  return creati
+}
+
+export async function appuntamentiSerie(serieId: string): Promise<Appuntamento[]> {
+  const rows = await db.appuntamenti.where('serieId').equals(serieId).toArray()
+  return rows.sort((a, b) => {
+    const cmp = a.data.localeCompare(b.data)
+    return cmp !== 0 ? cmp : a.ora.localeCompare(b.ora)
+  })
+}
+
+function indiceInSerie(apps: Appuntamento[], id: string): number {
+  return apps.findIndex((a) => a.id === id)
+}
+
+function successiviInSerie(apps: Appuntamento[], id: string): Appuntamento[] {
+  const i = indiceInSerie(apps, id)
+  if (i < 0) return []
+  return apps.slice(i)
+}
+
+export async function spostaSerieDa(
+  id: string,
+  ora: HHMM,
+  operatoreId: string,
+): Promise<Appuntamento[]> {
+  const app = await db.appuntamenti.get(id)
+  if (!app?.serieId) throw new Error('Appuntamento senza serie')
+  const serie = await appuntamentiSerie(app.serieId)
+  const bersagli = successiviInSerie(serie, id)
+  const prima = bersagli.map((a) => ({ ...a }))
+  const now = new Date().toISOString()
+  await db.transaction('rw', db.appuntamenti, async () => {
+    for (const a of bersagli) {
+      await db.appuntamenti.put({
+        ...a,
+        ora,
+        operatoreId,
+        aggiornatoIl: now,
+      })
+    }
+  })
+  return prima
+}
+
+export async function eliminaSerieDa(id: string): Promise<Appuntamento[]> {
+  const app = await db.appuntamenti.get(id)
+  if (!app?.serieId) throw new Error('Appuntamento senza serie')
+  const serie = await appuntamentiSerie(app.serieId)
+  const bersagli = successiviInSerie(serie, id)
+  const copia = bersagli.map((a) => ({ ...a }))
+  await db.transaction('rw', db.appuntamenti, async () => {
+    for (const a of bersagli) {
+      await db.appuntamenti.delete(a.id)
+    }
+  })
+  return copia
+}
+
+export async function ripristinaAppuntamenti(apps: Appuntamento[]): Promise<void> {
+  if (apps.length === 0) return
+  await db.transaction('rw', db.appuntamenti, async () => {
+    for (const a of apps) {
+      const esiste = await db.appuntamenti.get(a.id)
+      if (esiste) {
+        await db.appuntamenti.put(a)
+      } else {
+        await db.appuntamenti.add(a)
+      }
+    }
+  })
 }
 
 export async function cercaAppuntamenti(query: string, limite?: number): Promise<RisultatoRicerca[]> {
@@ -459,6 +793,10 @@ export async function cercaAppuntamenti(query: string, limite?: number): Promise
 
 export async function blocchiDelGiorno(data: ISODate): Promise<Blocco[]> {
   return db.blocchi.where('data').equals(data).toArray()
+}
+
+export async function blocchiTra(da: ISODate, a: ISODate): Promise<Blocco[]> {
+  return db.blocchi.where('data').between(da, a, true, true).toArray()
 }
 
 export async function salvaBlocco(b: Omit<Blocco, 'id'> & { id?: string }): Promise<Blocco> {
@@ -595,7 +933,17 @@ export async function debitiAperti(): Promise<RigaDebito[]> {
   const clienteIds = [...new Set(debiti.map((d) => d.clienteId))]
   const clienti = await db.clienti.where('id').anyOf(clienteIds).toArray()
   const clientiMap = new Map(clienti.map((c) => [c.id, c]))
-  return debiti.map((debito) => ({ debito, cliente: clientiMap.get(debito.clienteId)! }))
+  const clienteRimosso = (id: string): Cliente => ({
+    id,
+    nome: 'Cliente rimosso',
+    telefono: '',
+    creatoIl: '',
+    aggiornatoIl: '',
+  })
+  return debiti.map((debito) => ({
+    debito,
+    cliente: clientiMap.get(debito.clienteId) ?? clienteRimosso(debito.clienteId),
+  }))
 }
 
 export async function debitiCliente(clienteId: string): Promise<Debito[]> {
@@ -622,6 +970,12 @@ export async function leggiImpostazioni(): Promise<Impostazioni> {
     }
     if (valore.squadra === undefined && impostazioniDefault.squadra !== undefined) {
       valore = { ...valore, squadra: impostazioniDefault.squadra }
+    }
+    if (valore.messaggiRapidi === undefined && impostazioniDefault.messaggiRapidi !== undefined) {
+      valore = { ...valore, messaggiRapidi: impostazioniDefault.messaggiRapidi }
+    }
+    if (valore.testoRiepilogo === undefined && impostazioniDefault.testoRiepilogo !== undefined) {
+      valore = { ...valore, testoRiepilogo: impostazioniDefault.testoRiepilogo }
     }
     return valore
   }
@@ -655,30 +1009,96 @@ export async function esportaBackup(): Promise<Blob> {
   return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
 }
 
+function validaBackup(payload: unknown): {
+  clienti: Cliente[]
+  appuntamenti: Appuntamento[]
+  blocchi: Blocco[]
+  debiti: Debito[]
+  impostazioni?: Impostazioni
+} {
+  if (typeof payload !== 'object' || payload === null) {
+    throw new Error('Il file di backup non è valido')
+  }
+  const p = payload as Record<string, unknown>
+  if (p.versione !== 1) throw new Error('Versione backup non supportata')
+
+  const richiedeCampi = (oggetto: unknown, campi: string[], etichetta: string) => {
+    if (typeof oggetto !== 'object' || oggetto === null) {
+      throw new Error(`${etichetta}: voce non valida`)
+    }
+    for (const c of campi) {
+      if ((oggetto as Record<string, unknown>)[c] === undefined) {
+        throw new Error(`${etichetta}: manca il campo ${c}`)
+      }
+    }
+  }
+
+  if (!Array.isArray(p.clienti)) throw new Error('Il backup non contiene l’elenco clienti')
+  if (!Array.isArray(p.appuntamenti)) throw new Error('Il backup non contiene l’elenco appuntamenti')
+  if (!Array.isArray(p.blocchi)) throw new Error('Il backup non contiene l’elenco blocchi')
+
+  const clienti = p.clienti as Cliente[]
+  const appuntamenti = p.appuntamenti as Appuntamento[]
+  const blocchi = p.blocchi as Blocco[]
+  const debiti = Array.isArray(p.debiti) ? (p.debiti as Debito[]) : []
+
+  for (const c of clienti) {
+    richiedeCampi(c, ['id', 'nome', 'telefono', 'creatoIl', 'aggiornatoIl'], 'Cliente')
+  }
+  for (const a of appuntamenti) {
+    richiedeCampi(
+      a,
+      ['id', 'data', 'ora', 'durataMin', 'operatoreId', 'clienteId', 'stato', 'promemoria', 'creatoIl', 'aggiornatoIl'],
+      'Appuntamento',
+    )
+  }
+  for (const b of blocchi) {
+    richiedeCampi(b, ['id', 'data', 'operatoreId'], 'Blocco')
+  }
+  for (const d of debiti) {
+    richiedeCampi(
+      d,
+      ['id', 'clienteId', 'importoCent', 'data', 'creatoIl', 'aggiornatoIl'],
+      'Debito',
+    )
+  }
+
+  const impostazioni =
+    p.impostazioni !== undefined && typeof p.impostazioni === 'object' && p.impostazioni !== null
+      ? (p.impostazioni as Impostazioni)
+      : undefined
+
+  return { clienti, appuntamenti, blocchi, debiti, impostazioni }
+}
+
 export async function importaBackup(file: Blob): Promise<{ clienti: number; appuntamenti: number }> {
-  const testo = await file.text()
-  const payload = JSON.parse(testo)
-  if (payload.versione !== 1) throw new Error('Versione backup non supportata')
+  let payload: unknown
+  try {
+    payload = JSON.parse(await file.text())
+  } catch {
+    throw new Error('Il file non è un JSON valido')
+  }
+  const dati = validaBackup(payload)
   await db.transaction('rw', db.clienti, db.appuntamenti, db.blocchi, db.debiti, db.impostazioni, async () => {
     await db.clienti.clear()
     await db.appuntamenti.clear()
     await db.blocchi.clear()
     await db.debiti.clear()
     await db.impostazioni.clear()
-    await db.clienti.bulkAdd(payload.clienti ?? [])
-    await db.appuntamenti.bulkAdd(payload.appuntamenti ?? [])
-    await db.blocchi.bulkAdd(payload.blocchi ?? [])
-    await db.debiti.bulkAdd(payload.debiti ?? [])
-    if (payload.impostazioni) {
+    await db.clienti.bulkAdd(dati.clienti)
+    await db.appuntamenti.bulkAdd(dati.appuntamenti)
+    await db.blocchi.bulkAdd(dati.blocchi)
+    await db.debiti.bulkAdd(dati.debiti)
+    if (dati.impostazioni) {
       await db.impostazioni.add({
         id: 'impostazioni',
-        valore: { ...payload.impostazioni, demoAttiva: false },
+        valore: { ...dati.impostazioni, demoAttiva: false },
       })
     }
   })
   return {
-    clienti: payload.clienti?.length ?? 0,
-    appuntamenti: payload.appuntamenti?.length ?? 0,
+    clienti: dati.clienti.length,
+    appuntamenti: dati.appuntamenti.length,
   }
 }
 
@@ -786,6 +1206,15 @@ export async function caricaDatiDemo(): Promise<void> {
   ]
   await db.appuntamenti.bulkAdd(appuntamenti)
 
+  const lunediSettimana = settimanaDi(prossimo)[0]!
+  await db.blocchi.add({
+    id: crypto.randomUUID(),
+    operatoreId: null,
+    data: lunediSettimana,
+    motivo: 'Corso fornitori',
+    tipo: 'impegno',
+  })
+
   const debitiDemo: Debito[] = [
     {
       id: crypto.randomUUID(),
@@ -807,6 +1236,24 @@ export async function caricaDatiDemo(): Promise<void> {
     },
   ]
   await db.debiti.bulkAdd(debitiDemo)
+
+  const serieInizio = prossimo
+  await creaSerie(
+    {
+      ora: '09:30',
+      durataMin: serviziOrd[0]?.durataMin ?? 30,
+      operatoreId: op0,
+      clienteId: clienti[3]!.id,
+      servizioId: servizio0,
+      stato: 'prenotato',
+      promemoria: 'da_inviare',
+      note: 'Serie demo ogni 2 settimane',
+    },
+  datePerSerie(serieInizio, { ogni: 2, unita: 'settimane', volte: 4 }).map((data) => ({
+      data,
+      ora: '09:30',
+    })),
+  )
 }
 
 export async function svuotaTutto(): Promise<void> {

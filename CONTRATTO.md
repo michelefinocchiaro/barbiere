@@ -71,13 +71,30 @@ export interface Appuntamento {
   stato: StatoAppuntamento;
   promemoria: EsitoPromemoria;
   testoPromemoria?: string;     // testo ritoccato a mano per questo cliente; assente = testo standard
+  serieId?: string;             // uguale per tutti gli appuntamenti nati dalla stessa serie
   creatoIl: string; aggiornatoIl: string;
 }
+
+export interface RegolaSerie {
+  ogni: number;                   // >= 1
+  unita: "giorni" | "settimane" | "mesi";
+  volte?: number;                 // quante in tutto, la prima compresa
+  finoA?: ISODate;                // oppure fino a questa data compresa. Uno dei due è obbligatorio
+}
+export interface VoceSerie { data: ISODate; ora: HHMM; avvisi: Avviso[] }
 
 /** Pausa, assenza o chiusura. operatoreId null = tutto il negozio. dalle/alle assenti = giornata intera. */
 export interface Blocco {
   id: string; operatoreId: string | null; data: ISODate;
   dalle?: HHMM; alle?: HHMM; motivo?: string;
+  tipo?: "assenza" | "impegno";   // assenza = default; impegno = evento extra, motivo è il titolo
+}
+
+/** Un messaggio WhatsApp già pronto, da mandare con un tocco dal pannello dell'appuntamento. */
+export interface MessaggioRapido {
+  id: string; etichetta: string;   // "Sii puntuale", "Ritarda 10 min"
+  testo: string;                   // segnaposto {nome} {ora} {ora_dopo} {quando}
+  ritardoMin?: number;             // se c'è, {ora_dopo} = ora + ritardoMin
 }
 
 export interface Impostazioni {
@@ -94,6 +111,8 @@ export interface Impostazioni {
   frasi?: Partial<Record<MomentoFrase, string[]>>;  // battute dell'app per chi sta al bancone; mancano = predefinite
   demoAttiva?: boolean;         // true dopo caricaDatiDemo, false dopo svuotaTutto/importaBackup
   squadra?: MembroSquadra[];    // ritratti in fondo alla barra laterale (solo tablet e PC); mancano = niente ritratti
+  messaggiRapidi?: MessaggioRapido[];  // mancano = quelli di src/negozi/<negozio>.ts (come `frasi`)
+  testoRiepilogo?: string;             // segnaposto {elenco}; manca = quello del negozio
 }
 
 /** Un ritratto della squadra: toccandolo dice la sua frase in una nuvoletta. */
@@ -147,6 +166,11 @@ export interface RisultatoRicerca {
   appuntamento: Appuntamento; cliente: Cliente; operatore?: Operatore; servizio?: Servizio;
   futuro: boolean;              // data >= oggi
 }
+
+export interface RiepilogoCliente {
+  cliente: Cliente; appuntamenti: Appuntamento[];   // futuri non disdetti, dal più vicino
+  testo: string; link: string;
+}
 ```
 
 ## Funzioni (`src/core/index.ts`)
@@ -161,12 +185,18 @@ formattaTelefono(normalizzato: string): string             // "393331234567" -> 
 formattaOra(ora: HHMM): string                             // "08:15" -> "8.15", "14:00" -> "14.00"
 quando(dataAppuntamento: ISODate, oggi: ISODate): string   // vedi regole
 prossimoGiornoApertura(da: ISODate, imp: Impostazioni, blocchi: Blocco[]): ISODate
+settimanaDi(data: ISODate): ISODate[]                       // 7 date, da lunedì a domenica, che contengono `data`
+giornoAperto(data: ISODate, imp: Impostazioni, blocchi: Blocco[]): boolean
 componiPromemoria(modello: string, valori: Record<string, string>): string
 linkWhatsApp(telefono: string, testo: string): string
 oggi(): ISODate                                            // data corrente a Europe/Rome
 momentoDellaGiornata(data: ISODate, ora: HHMM, imp: Impostazioni, blocchi: Blocco[],
                      teste: number, restanti: number): MomentoFrase
 fraseDelMomento(momento: MomentoFrase, contesto: ContestoFrase, imp: Impostazioni): string
+sommaMinuti(ora: HHMM, minuti: number): HHMM               // "08:50"+10 -> "09:00"; mai oltre "23:59"
+giornoEsteso(data: ISODate): string                         // "martedì 17 novembre"
+componiMessaggioRapido(m: MessaggioRapido, a: Appuntamento, c: Cliente, oggi: ISODate): string
+datePerSerie(inizio: ISODate, r: RegolaSerie): ISODate[]   // `inizio` compreso; al massimo 60 date
 ```
 
 **Regole che i test devono fissare:**
@@ -176,18 +206,20 @@ fraseDelMomento(momento: MomentoFrase, contesto: ContestoFrase, imp: Impostazion
 - `quando`: lo stesso giorno → `"oggi"`; il giorno dopo → `"domani"`; dal secondo al sesto giorno
   → il nome del giorno in minuscolo (`"martedì"`); oltre → `"martedì 18 novembre"`.
 - `prossimoGiornoApertura`: il primo giorno **dopo** `da` che sta in `giorniApertura` e non ha un
-  blocco di tutto il negozio per la giornata intera. Sabato 14/11/2026 → martedì 17/11/2026.
+  blocco di tutto il negozio per la giornata intera (i blocchi `impegno` non contano). Sabato 14/11/2026 → martedì 17/11/2026.
+- `settimanaDi`: sette date da lunedì a domenica della settimana che contiene `data`.
+- `giornoAperto`: il giorno è in `giorniApertura` e non ha blocco di tutto il negozio a giornata intera (ignora `impegno`).
 - `componiPromemoria`: sostituisce i segnaposto noti e **lascia intatti quelli sconosciuti**.
   Non tocca nient'altro: emoji, `’`, a capo, maiuscole restano identici.
-- `momentoDellaGiornata`: giorno chiuso (fuori da `giorniApertura` o blocco di tutto il negozio per
-  la giornata intera) → `"chiuso"`; `teste === 0` → `"giornata_vuota"`; ora ≥ `chiude` oppure
+- `momentoDellaGiornata`: giorno chiuso (come `giornoAperto` falso) → `"chiuso"`; `teste === 0` → `"giornata_vuota"`; ora ≥ `chiude` oppure
   `restanti === 0` → `"fine_giornata"`; prima delle 12:00 → `"mattina"`; prima delle 17:00 →
   `"pomeriggio"`; altrimenti `"sera"`.
-- `fraseDelMomento`: prende `imp.frasi[momento]` se non vuoto, altrimenti `FRASI_PREDEFINITE[momento]`.
-  La scelta è **deterministica**: stesso giorno e stesso momento → stessa frase (non cambia a ogni
-  aggiornamento della schermata), giorni diversi → di solito frasi diverse (indice = hash di
-  `data + momento` modulo il numero di frasi). Segnaposto: `{teste}` `{restanti}` `{prossimo}`
-  `{operatore}` (un operatore attivo scelto con lo stesso hash), sostituiti con `componiPromemoria`.
+- `fraseDelMomento`: scarta le frasi (anche in `imp.frasi`) che contengono `{teste}` o `{restanti}`; se
+  non ne resta nessuna usa `FRASI_PREDEFINITE[momento]`. La scelta è **deterministica**: stesso giorno e
+  stesso momento → stessa frase. Segnaposto ammessi: `{prossimo}` `{operatore}` (un operatore attivo
+  scelto con lo stesso hash), sostituiti con `componiPromemoria`.
+- `datePerSerie`: `"mesi"` tiene il giorno del mese e, se non esiste (31 → febbraio), usa l'ultimo del mese
+  **senza trascinare l'errore** ai mesi dopo. Non salta i giorni chiusi: li segnala l'anteprima.
 - `linkWhatsApp`: `https://api.whatsapp.com/send/?phone=<telefono>&text=<encodeURIComponent(testo)>`.
   **Non `wa.me`**: il suo rimando sostituisce le emoji di 4 byte con `�` (verificato il 9/11/2026:
   `%F0%9F%98%89` arriva come `%EF%BF%BD`). Il testo decodificato
@@ -215,15 +247,39 @@ spostaAppuntamento(id: string, data: ISODate, ora: HHMM, operatoreId: string):
   Promise<{ appuntamento: Appuntamento; avvisi: Avviso[] }>     // se cambia il giorno, promemoria torna "da_inviare"
 impostaStato(id: string, stato: StatoAppuntamento): Promise<void>
 eliminaAppuntamento(id: string): Promise<void>                  // per gli errori di battitura; disdire è impostaStato
+scambiaAppuntamenti(idA: string, idB: string):
+  Promise<{ a: Appuntamento; b: Appuntamento; avvisi: Avviso[] }>
+riepilogoCliente(clienteId: string, da?: ISODate): Promise<RiepilogoCliente>   // da = oggi()
 cercaAppuntamenti(query: string, limite?: number): Promise<RisultatoRicerca[]>
   // stesso criterio di cercaClienti (nome senza maiuscole/accenti, o cifre del telefono);
   // prima i futuri (data >= oggi) dal più vicino, poi i passati dal più recente; disdetti inclusi;
   // query vuota o di 1 carattere → []; limite predefinito 30
+appuntamentiTra(da: ISODate, a: ISODate): Promise<Appuntamento[]>   // estremi inclusi, disdetti inclusi
 blocchiDelGiorno(data: ISODate): Promise<Blocco[]>
+blocchiTra(da: ISODate, a: ISODate): Promise<Blocco[]>
 salvaBlocco(b: Omit<Blocco,"id"> & { id?: string }): Promise<Blocco>
 eliminaBlocco(id: string): Promise<void>
+anteprimaSerie(base: Pick<Appuntamento,"ora"|"durataMin"|"operatoreId">, date: ISODate[]): Promise<VoceSerie[]>
+creaSerie(base: Omit<Appuntamento,"id"|"creatoIl"|"aggiornatoIl"|"data"|"serieId">,
+          voci: { data: ISODate; ora: HHMM }[]): Promise<Appuntamento[]>   // una transazione, un serieId nuovo
+appuntamentiSerie(serieId: string): Promise<Appuntamento[]>                 // per data e ora
+spostaSerieDa(id: string, ora: HHMM, operatoreId: string): Promise<Appuntamento[]>   // cambia ora e operatore a questo e ai successivi della serie (le date restano); restituisce i precedenti per Annulla
+eliminaSerieDa(id: string): Promise<Appuntamento[]>        // elimina questo e i successivi; restituisce gli eliminati
+ripristinaAppuntamenti(apps: Appuntamento[]): Promise<void>  // rimette i record com'erano (Annulla)
 ```
+- Nuovo indice Dexie `serieId` sulla tabella `appuntamenti` (versione 3); il backup resta `versione: 1`
+  (`serieId` facoltativo).
+- Un blocco `impegno` **non chiude il negozio**: `prossimoGiornoApertura`, `giornoAperto` e
+  `momentoDellaGiornata` lo ignorano. Negli avvisi dà `tipo: "assenza"` col messaggio
+  `C'è un impegno in questo orario: {motivo}`.
+- `data` è già indicizzata: nessuna nuova versione Dexie. Backup vecchi validi (campo facoltativo).
 Le sovrapposizioni ignorano gli appuntamenti `disdetto`.
+- `scambiaAppuntamenti`: A prende `data`, `ora`, `operatoreId` di B e viceversa, in **una transazione**.
+  Durata, cliente, servizio, note, stato restano a ciascuno. A chi cambia **giorno** il promemoria torna
+  `da_inviare`. Gli avvisi si calcolano dopo lo scambio (durate diverse possono sovrapporsi: si avvisa, non si blocca).
+  Rifarlo con gli stessi id riporta gli orari com'erano (è l'«Annulla»). Id inesistente o `idA === idB` → errore.
+- `riepilogoCliente`: una riga per appuntamento, `• {giornoEsteso} alle {formattaOra}`, unite da a capo dentro
+  `{elenco}`. Link con `linkWhatsApp`. Testo byte per byte come composto (emoji comprese).
 
 ### Promemoria
 ```ts
@@ -253,6 +309,18 @@ leggiEuro(input: string): number | null                   // "15" "15,5" "15.50"
 - Schema Dexie: nuova versione con la tabella `debiti` (indici: `id, clienteId, pagatoIl, data`),
   senza perdere i dati della versione precedente.
 
+#### Come si aggiunge un campo o una tabella
+
+1. **Contratto e tipi** — aggiornare `tipi.ts` e questa sezione; la UI e il core devono restare
+   d’accordo prima di scrivere codice.
+2. **Dexie** — aggiungere `db.version(N+1).stores({ … })` con gli indici nuovi o modificati; non
+   toccare le versioni già rilasciate. Dexie conserva i record esistenti; migrazioni esplicite solo
+   se serve trasformare i dati.
+3. **Backup** — se il JSON cambia forma, concordare un bump di `versione` nel file esportato;
+   `importaBackup` deve accettare ancora i backup col numero vecchio (campi mancanti = default sensati).
+4. **Test** — almeno un test che apre un database alla versione precedente con dati e verifica che,
+   dopo l’upgrade, tutto sia ancora presente.
+
 ### Impostazioni, backup, demo
 ```ts
 leggiImpostazioni(): Promise<Impostazioni>           // al primo avvio: i valori di src/negozi/<negozio>.ts
@@ -263,8 +331,8 @@ giorniDallUltimoBackup(): Promise<number | null>
 caricaDatiDemo(): Promise<void>                       // SOLO dati inventati, vedi sotto; imposta demoAttiva = true
 svuotaTutto(): Promise<void>                          // demoAttiva = false
 ```
-`leggiImpostazioni`: se le impostazioni salvate non hanno `frasi` (o `squadra`), le prende da `src/negozi/<negozio>.ts`
-(così chi aveva già l'app riceve le battute nuove). `FRASI_PREDEFINITE` è esportato da `index.ts`.
+`leggiImpostazioni`: se le impostazioni salvate non hanno `frasi` (o `squadra`, `messaggiRapidi`, `testoRiepilogo`),
+le prende da `src/negozi/<negozio>.ts` (così chi aveva già l'app riceve le novità). `FRASI_PREDEFINITE` è esportato da `index.ts`.
 
 ## Un negozio: `src/negozi/<negozio>.ts`
 

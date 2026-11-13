@@ -56,6 +56,43 @@
   color: var(--tc-crema);
 }
 
+.imp-nota {
+  margin: 0 0 0.75rem;
+  font-size: var(--tc-fs-sm);
+  color: var(--tc-argento);
+}
+
+.imp-lista-messaggi {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.imp-lista-messaggi li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.imp-lista-messaggi label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--tc-argento);
+}
+
+.imp-lista-messaggi input,
+.imp-lista-messaggi textarea {
+  background: var(--tc-nero);
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 6px;
+  padding: 0.65rem;
+  color: var(--tc-crema);
+}
+
 .imp-testo {
   width: 100%;
   background: var(--tc-nero);
