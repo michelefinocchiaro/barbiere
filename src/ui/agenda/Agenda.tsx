@@ -6,6 +6,7 @@ import {
   appuntamentiTra,
   blocchiDelGiorno,
   blocchiTra,
+  compleannoNelGiorno,
   formattaOra,
   fraseDelMomento,
   giornoAperto,
@@ -60,6 +61,7 @@ type PannelloAgenda = SlotTap | ModificaTap
 interface AgendaProps {
   onToast?: (t: ToastAzione) => void
   dataIniziale?: ISODate | null
+  onApriSchedaCliente?: (clienteId: string) => void
 }
 
 function useMinuto(): HHMM {
@@ -87,7 +89,7 @@ function conteggioServizi(appuntamenti: Appuntamento[], imp: Impostazioni): stri
     .join(' · ')
 }
 
-export function Agenda({ onToast, dataIniziale }: AgendaProps) {
+export function Agenda({ onToast, dataIniziale, onApriSchedaCliente }: AgendaProps) {
   const [data, setData] = useState<ISODate>(() => dataIniziale ?? oggi())
   const [nascondiDisdetti, setNascondiDisdetti] = useState(true)
   const [vista, setVista] = useState<VistaAgenda>(() => leggiVistaAgenda())
@@ -629,6 +631,7 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
               onToast={onToast}
               onIniziaScambio={iniziaScambio}
               onVaiAData={vaiAAppuntamentoSerie}
+              onApriSchedaCliente={onApriSchedaCliente}
             />
           </>
         ) : null}
@@ -724,6 +727,7 @@ export function Agenda({ onToast, dataIniziale }: AgendaProps) {
             onToast={onToast}
             onIniziaScambio={iniziaScambio}
             onVaiAData={vaiAAppuntamentoSerie}
+            onApriSchedaCliente={onApriSchedaCliente}
           />
         </>
       ) : null}
@@ -797,11 +801,13 @@ function ColonnaOperatore({
           const inAttesa =
             a.promemoria === 'inviato' && a.stato !== 'confermato' && a.stato !== 'disdetto'
           const breve = a.durataMin <= 20
-          const clienteNome = mappaClienti.get(a.clienteId)?.nome ?? '…'
+          const cliente = mappaClienti.get(a.clienteId)
+          const clienteNome = cliente?.nome ?? '…'
+          const torta = cliente && compleannoNelGiorno(cliente.compleanno, data) ? ' 🎂' : ''
           const servizioNome = nomeServizio(a.servizioId)
           const rigaBreve = servizioNome
-            ? `${formattaOra(a.ora)} ${clienteNome} · ${servizioNome}`
-            : `${formattaOra(a.ora)} ${clienteNome}`
+            ? `${formattaOra(a.ora)} ${clienteNome}${torta} · ${servizioNome}`
+            : `${formattaOra(a.ora)} ${clienteNome}${torta}`
           return (
             <button
               key={a.id}
@@ -823,7 +829,10 @@ function ColonnaOperatore({
               ) : (
                 <>
                   <span className="app-blocco-ora font-tabular">{formattaOra(a.ora)}</span>
-                  <span className="app-blocco-cliente">{clienteNome}</span>
+                  <span className="app-blocco-cliente">
+                    {clienteNome}
+                    {torta}
+                  </span>
                   {servizioNome ? <span className="app-blocco-servizio">{servizioNome}</span> : null}
                 </>
               )}

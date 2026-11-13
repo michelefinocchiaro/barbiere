@@ -1,0 +1,62 @@
+.clienti-compleanni {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 8px;
+  background: var(--tc-superficie);
+}
+
+.clienti-compleanni h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.compleanni-gruppo h3 {
+  margin: 0.75rem 0 0.35rem;
+  font-size: var(--tc-fs-sm);
+  color: var(--tc-argento);
+}
+
+.compleanni-gruppo ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.compleanni-gruppo li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--tc-argento-scuro);
+}
+
+.compleanni-gruppo li.fatto .compleanni-nome {
+  opacity: 0.75;
+}
+
+.compleanni-nome {
+  flex: 1;
+  min-width: 8rem;
+}
+
+.compleanni-data {
+  font-size: var(--tc-fs-sm);
+  color: var(--tc-argento);
+}
+
+.btn-auguri {
+  font-size: var(--tc-fs-sm);
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--tc-argento-scuro);
+  background: var(--tc-nero);
+  color: var(--tc-crema);
+  text-decoration: none;
+}
+
+.compleanni-spunta {
+  color: var(--tc-oro);
+  font-weight: 700;
+}

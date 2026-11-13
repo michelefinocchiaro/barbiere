@@ -39,6 +39,7 @@ Ci vediamo alle {ora}`,
   testoRiepilogo: `Ciao friend ecco i tuoi appuntamenti:
 {elenco}
 RESTIAMO IN ATTESA DI CONFERMA !! 😉💈💇🏻‍♂️👋🏻`,
+  testoAuguri: 'Tanti auguri friend!! 🎉🎂 Buon compleanno da tutto lo staff 💈👋🏻',
   frasi: {
     mattina: [
       'Buongiorno friend! Si parte con le forbici affilate 💈',

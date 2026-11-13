@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Appuntamento, Blocco, Cliente, Impostazioni, ISODate, Operatore } from '../../core'
-import { formattaOra, giornoAperto, settimanaDi } from '../../core'
+import { compleannoNelGiorno, formattaOra, giornoAperto, settimanaDi } from '../../core'
 import { formattaDataBreve } from '../utils/dateUi'
 import { coloreOperatore } from '../utils/coloreOperatore'
 import './AgendaSettimana.css'
@@ -126,7 +126,10 @@ function ColonnaGiorno({
         {voci.map((v) => {
           if (v.tipo === 'app') {
             const a = v.app
-            const cliente = mappaClienti.get(a.clienteId)?.nome ?? '…'
+            const record = mappaClienti.get(a.clienteId)
+            const cliente = record?.nome ?? '…'
+            const torta =
+              record && compleannoNelGiorno(record.compleanno, giorno) ? ' 🎂' : ''
             const sigla = siglaOperatore(operatori, a.operatoreId)
             const colore = coloreOperatore(a.operatoreId, imp)
             return (
@@ -141,6 +144,7 @@ function ColonnaGiorno({
                   <span className="agenda-sett-cliente">
                     {a.serieId ? <span className="agenda-sett-serie-mark" aria-hidden>↻ </span> : null}
                     {cliente}
+                    {torta}
                   </span>
                   <span className="agenda-sett-op" title={operatori.find((o) => o.id === a.operatoreId)?.nome}>
                     {sigla}

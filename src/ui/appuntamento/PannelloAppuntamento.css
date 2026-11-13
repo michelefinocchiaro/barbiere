@@ -228,7 +228,7 @@
   }
 
   .servizi-pulsanti .griglia-servizi {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .azioni-modifica {
@@ -483,4 +483,41 @@
   .pannello-corpo:has(.modulo-ripeti) {
     overflow: hidden;
   }
+
+  .pannello-azioni-lato .storico-cliente {
+    display: none;
+  }
+
+  .pannello-azioni-lato .pannello-serie-date {
+    max-height: 4rem;
+  }
+
+  .pannello-cliente-annotazioni {
+    font-size: var(--tc-fs-sm);
+  }
 }
+
+.pannello-cliente-annotazioni {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border: 1px solid var(--tc-argento-scuro);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.pannello-cliente-annotazioni p {
+  margin: 0;
+  color: var(--tc-argento);
+}
+
+.pannello-taglio-abituale strong,
+.pannello-note-cliente strong {
+  color: var(--tc-crema);
+}
+
+.btn-apri-scheda {
+  align-self: flex-start;
+}
+

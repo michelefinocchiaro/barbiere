@@ -1,28 +1,46 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import type { Cliente } from '../../core'
+import type { Cliente, Debito } from '../../core'
 import {
   cercaClienti,
-  debitiCliente,
   formattaEuro,
   formattaOra,
   formattaTelefono,
+  giornoEsteso,
+  leggiCompleanno,
   leggiImpostazioni,
   normalizzaTelefono,
+  parseCompleanno,
   salvaCliente,
+  schedaCliente,
   storicoCliente,
   tuttiIClienti,
 } from '../../core'
 import { formattaDataLunga } from '../utils/dateUi'
 import { InviaRiepilogoCliente } from '../components/InviaRiepilogoCliente'
+import type { ToastAzione } from '../components/Toast'
+import { RiquadroCompleanni } from './RiquadroCompleanni'
 import './Clienti.css'
+import './RiquadroCompleanni.css'
 
-export function Clienti() {
+interface Props {
+  clienteInizialeId?: string | null
+  onToast?: (t: ToastAzione) => void
+}
+
+export function Clienti({ clienteInizialeId, onToast }: Props) {
   const [query, setQuery] = useState('')
   const [selezionato, setSelezionato] = useState<Cliente | null>(null)
 
   const imp = useLiveQuery(() => leggiImpostazioni(), [])
   const tutti = useLiveQuery(() => tuttiIClienti(), [])
+
+  useEffect(() => {
+    if (!clienteInizialeId || !tutti) return
+    const c = tutti.find((x) => x.id === clienteInizialeId)
+    if (c) setSelezionato(c)
+  }, [clienteInizialeId, tutti])
+
   const filtrati = useLiveQuery(
     () => (query.trim() ? cercaClienti(query, 50) : tuttiIClienti()),
     [query],
@@ -47,20 +65,23 @@ export function Clienti() {
       </header>
 
       <div className={`clienti-corpo${selezionato ? ' clienti-vista-scheda' : ''}`}>
-        <ul className="clienti-lista">
-          {lista.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                className={`cliente-voce${selezionato?.id === c.id ? ' attivo' : ''}`}
-                onClick={() => setSelezionato(c)}
-              >
-                <span className="cliente-nome">{c.nome}</span>
-                <span className="cliente-tel">{formattaTelefono(c.telefono)}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className="clienti-lista-colonna">
+          {!selezionato ? <RiquadroCompleanni onToast={onToast} /> : null}
+          <ul className="clienti-lista">
+            {lista.map((c) => (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  className={`cliente-voce${selezionato?.id === c.id ? ' attivo' : ''}`}
+                  onClick={() => setSelezionato(c)}
+                >
+                  <span className="cliente-nome">{c.nome}</span>
+                  <span className="cliente-tel">{formattaTelefono(c.telefono)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
 
         {selezionato ? (
           <div className="clienti-scheda-wrap">
@@ -70,6 +91,7 @@ export function Clienti() {
             <SchedaCliente
               cliente={selezionato}
               prefisso={imp?.prefissoPredefinito ?? '39'}
+              operatori={(imp?.operatori ?? []).filter((o) => o.attivo)}
               onSalvato={setSelezionato}
             />
           </div>
@@ -84,33 +106,37 @@ export function Clienti() {
 function SchedaCliente({
   cliente,
   prefisso,
+  operatori,
   onSalvato,
 }: {
   cliente: Cliente
   prefisso: string
+  operatori: { id: string; nome: string }[]
   onSalvato: (c: Cliente) => void
 }) {
   const [nome, setNome] = useState(cliente.nome)
   const [telefono, setTelefono] = useState(formattaTelefono(cliente.telefono))
   const [note, setNote] = useState(cliente.note ?? '')
+  const [taglioAbituale, setTaglioAbituale] = useState(cliente.taglioAbituale ?? '')
+  const [operatorePreferitoId, setOperatorePreferitoId] = useState(cliente.operatorePreferitoId ?? '')
+  const [giornoC, setGiornoC] = useState(() => giornoIniziale(cliente.compleanno))
+  const [meseC, setMeseC] = useState(() => meseIniziale(cliente.compleanno))
+  const [annoC, setAnnoC] = useState(() => annoIniziale(cliente.compleanno))
   const [errore, setErrore] = useState('')
 
+  const scheda = useLiveQuery(() => schedaCliente(cliente.id), [cliente.id])
   const storico = useLiveQuery(() => storicoCliente(cliente.id), [cliente.id])
-  const debiti = useLiveQuery(() => debitiCliente(cliente.id), [cliente.id])
 
-  const debitiAperti = (debiti ?? []).filter((d) => !d.pagatoIl)
-  const debitiPagati = (debiti ?? []).filter((d) => d.pagatoIl)
-  const totaleApertoCent = debitiAperti.reduce((s, d) => s + d.importoCent, 0)
-
-  const formattaPagatoIl = (iso: string) => {
-    const d = new Date(iso)
-    return new Intl.DateTimeFormat('it-IT', {
-      timeZone: 'Europe/Rome',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    }).format(d)
-  }
+  useEffect(() => {
+    setNome(cliente.nome)
+    setTelefono(formattaTelefono(cliente.telefono))
+    setNote(cliente.note ?? '')
+    setTaglioAbituale(cliente.taglioAbituale ?? '')
+    setOperatorePreferitoId(cliente.operatorePreferitoId ?? '')
+    setGiornoC(giornoIniziale(cliente.compleanno))
+    setMeseC(meseIniziale(cliente.compleanno))
+    setAnnoC(annoIniziale(cliente.compleanno))
+  }, [cliente])
 
   const salva = async () => {
     const norm = normalizzaTelefono(telefono, prefisso)
@@ -118,11 +144,31 @@ function SchedaCliente({
       setErrore('Numero non valido')
       return
     }
+    let compleanno: string | undefined
+    if (giornoC.trim() && meseC.trim()) {
+      const g = Number(giornoC)
+      const m = Number(meseC)
+      const a = annoC.trim() ? Number(annoC) : undefined
+      const letto = leggiCompleanno(g, m, a)
+      if (!letto) {
+        setErrore('Compleanno non valido')
+        return
+      }
+      compleanno = letto
+    } else if (!giornoC.trim() && !meseC.trim()) {
+      compleanno = undefined
+    } else {
+      setErrore('Compleanno incompleto')
+      return
+    }
     const aggiornato: Cliente = {
       ...cliente,
       nome: nome.trim(),
       telefono: norm,
       note: note.trim() || undefined,
+      taglioAbituale: taglioAbituale.trim() || undefined,
+      operatorePreferitoId: operatorePreferitoId || undefined,
+      compleanno,
       aggiornatoIl: new Date().toISOString(),
     }
     await salvaCliente(aggiornato)
@@ -130,62 +176,165 @@ function SchedaCliente({
     setErrore('')
   }
 
+  const s = scheda
+
   return (
     <div className="cliente-scheda">
-      <label>
-        Nome
-        <input value={nome} onChange={(e) => setNome(e.target.value)} />
-      </label>
-      <label>
-        Telefono
-        <input type="tel" inputMode="numeric" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-      </label>
-      <label>
-        Note
-        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} />
-      </label>
-      {errore ? <p className="errore">{errore}</p> : null}
-      <button type="button" className="btn-salva-cliente" onClick={() => void salva()}>
-        Salva
-      </button>
+      <div className="cliente-scheda-colonne">
+        <div className="cliente-scheda-modifica">
+          <label>
+            Nome
+            <input value={nome} onChange={(e) => setNome(e.target.value)} />
+          </label>
+          <label>
+            Telefono
+            <input type="tel" inputMode="numeric" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+          </label>
+          <fieldset className="cliente-compleanno-campi">
+            <legend>Compleanno</legend>
+            <div className="cliente-compleanno-riga">
+              <label>
+                Giorno
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={giornoC}
+                  onChange={(e) => setGiornoC(e.target.value)}
+                />
+              </label>
+              <label>
+                Mese
+                <input
+                  type="number"
+                  min={1}
+                  max={12}
+                  value={meseC}
+                  onChange={(e) => setMeseC(e.target.value)}
+                />
+              </label>
+              <label>
+                Anno <span className="opzionale">(facoltativo)</span>
+                <input
+                  type="number"
+                  min={1900}
+                  max={2100}
+                  value={annoC}
+                  onChange={(e) => setAnnoC(e.target.value)}
+                  placeholder="—"
+                />
+              </label>
+            </div>
+          </fieldset>
+          <label>
+            Taglio abituale
+            <textarea value={taglioAbituale} onChange={(e) => setTaglioAbituale(e.target.value)} rows={2} />
+          </label>
+          <label>
+            Operatore preferito
+            <select
+              value={operatorePreferitoId}
+              onChange={(e) => setOperatorePreferitoId(e.target.value)}
+            >
+              <option value="">—</option>
+              {operatori.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.nome}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label>
+            Note
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} />
+          </label>
+          {errore ? <p className="errore">{errore}</p> : null}
+          <button type="button" className="btn-salva-cliente" onClick={() => void salva()}>
+            Salva
+          </button>
+        </div>
 
-      <InviaRiepilogoCliente clienteId={cliente.id} />
+        <div className="cliente-scheda-info">
+          {s ? (
+            <>
+              {s.ultimaVisita ? (
+                <p className="cliente-info-riga">
+                  <strong>Ultima volta:</strong> {giornoEsteso(s.ultimaVisita.data)} alle{' '}
+                  {formattaOra(s.ultimaVisita.ora)}
+                </p>
+              ) : (
+                <p className="cliente-info-riga cliente-info-mancante">
+                  <strong>Ultima volta:</strong> —
+                </p>
+              )}
+              {s.prossimo ? (
+                <p className="cliente-info-riga">
+                  <strong>Prossimo appuntamento:</strong> {giornoEsteso(s.prossimo.data)} alle{' '}
+                  {formattaOra(s.prossimo.ora)}
+                </p>
+              ) : null}
+              {s.servizioAbituale || s.operatoreAbituale ? (
+                <p className="cliente-info-riga">
+                  <strong>Di solito:</strong>{' '}
+                  {[s.servizioAbituale?.nome, s.operatoreAbituale?.nome].filter(Boolean).join(' · ')}
+                </p>
+              ) : null}
+              {s.ogniQuantiGiorni !== undefined ? (
+                <p className="cliente-info-riga">
+                  <strong>Viene ogni circa</strong> {Math.max(1, Math.round(s.ogniQuantiGiorni / 7))} settimane
+                </p>
+              ) : null}
+              {s.compleanno ? (
+                <p className="cliente-info-riga">
+                  <strong>Prossimo compleanno:</strong> {formattaDataLunga(s.compleanno.data)}
+                  {s.compleanno.anni !== undefined ? ` (${s.compleanno.anni} anni)` : ''}
+                </p>
+              ) : null}
+            </>
+          ) : null}
 
-      {debitiAperti.length > 0 ? (
-        <section className="cliente-debiti">
-          <h2>Da pagare</h2>
-          <p className="cliente-debiti-totale tabular-nums">
-            Totale: <strong>{formattaEuro(totaleApertoCent)}</strong>
-          </p>
-          <ul className="cliente-debiti-lista">
-            {debitiAperti.map((d) => (
-              <li key={d.id}>
-                <span className="tabular-nums">{formattaEuro(d.importoCent)}</span>
-                <span> · {formattaDataLunga(d.data)}</span>
-                {d.nota ? <span className="cliente-debiti-nota"> — {d.nota}</span> : null}
+          <InviaRiepilogoCliente clienteId={cliente.id} />
+
+          {s && s.debitiAperti.length > 0 ? (
+            <section className="cliente-debiti">
+              <h2>Conti aperti</h2>
+              <ul className="cliente-debiti-lista">
+                {s.debitiAperti.map((d: Debito) => (
+                  <li key={d.id}>
+                    <span className="tabular-nums">{formattaEuro(d.importoCent)}</span>
+                    <span> · {formattaDataLunga(d.data)}</span>
+                    {d.nota ? <span className="cliente-debiti-nota"> — {d.nota}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <h2>Storico appuntamenti</h2>
+          <ul className="storico-lista">
+            {(storico ?? []).map((a) => (
+              <li key={a.id}>
+                {formattaDataLunga(a.data)}, {formattaOra(a.ora)} · {a.stato}
               </li>
             ))}
           </ul>
-          {debitiPagati.length > 0 ? (
-            <ul className="cliente-debiti-pagati">
-              {debitiPagati.map((d) => (
-                <li key={d.id}>
-                  {formattaEuro(d.importoCent)} — pagato il {formattaPagatoIl(d.pagatoIl!)}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
-      ) : null}
-
-      <h2>Storico appuntamenti</h2>
-      <ul className="storico-lista">
-        {(storico ?? []).map((a) => (
-          <li key={a.id}>
-            {formattaDataLunga(a.data)}, {formattaOra(a.ora)} · {a.stato}
-          </li>
-        ))}
-      </ul>
+        </div>
+      </div>
     </div>
   )
+}
+
+function giornoIniziale(compleanno?: string): string {
+  const p = compleanno ? parseCompleanno(compleanno) : null
+  return p ? String(p.giorno) : ''
+}
+
+function meseIniziale(compleanno?: string): string {
+  const p = compleanno ? parseCompleanno(compleanno) : null
+  return p ? String(p.mese) : ''
+}
+
+function annoIniziale(compleanno?: string): string {
+  const p = compleanno ? parseCompleanno(compleanno) : null
+  return p?.anno !== undefined ? String(p.anno) : ''
 }

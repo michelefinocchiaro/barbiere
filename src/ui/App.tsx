@@ -20,6 +20,7 @@ export default function App() {
   const [toast, setToast] = useState<ToastAzione | null>(null)
   const [skipBenvenuto, setSkipBenvenuto] = useState(false)
   const [agendaDataIniziale, setAgendaDataIniziale] = useState<ISODate | null>(null)
+  const [clienteSchedaId, setClienteSchedaId] = useState<string | null>(null)
 
   const imp = useLiveQuery(() => leggiImpostazioni(), [])
   const clienti = useLiveQuery(() => tuttiIClienti(), [])
@@ -35,6 +36,13 @@ export default function App() {
   const naviga = useCallback((v: VoceNav) => {
     setSkipBenvenuto(true)
     setVoce(v)
+    if (v !== 'clienti') setClienteSchedaId(null)
+  }, [])
+
+  const apriSchedaCliente = useCallback((id: string) => {
+    setSkipBenvenuto(true)
+    setClienteSchedaId(id)
+    setVoce('clienti')
   }, [])
 
   const logoUrl = imp?.logo ? `${import.meta.env.BASE_URL}${imp.logo}` : ''
@@ -55,10 +63,12 @@ export default function App() {
       <Layout voce={voce} onNaviga={naviga}>
         <ErrorBoundary>
           {voce === 'agenda' ? (
-            <Agenda onToast={onToast} dataIniziale={agendaDataIniziale} />
+            <Agenda onToast={onToast} dataIniziale={agendaDataIniziale} onApriSchedaCliente={apriSchedaCliente} />
           ) : null}
           {voce === 'promemoria' ? <Promemoria onToast={onToast} /> : null}
-          {voce === 'clienti' ? <Clienti /> : null}
+          {voce === 'clienti' ? (
+            <Clienti clienteInizialeId={clienteSchedaId} onToast={onToast} />
+          ) : null}
           {voce === 'debiti' ? <DaPagare onToast={onToast} /> : null}
           {voce === 'impostazioni' ? <ImpostazioniSchermata /> : null}
         </ErrorBoundary>

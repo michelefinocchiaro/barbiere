@@ -53,6 +53,10 @@ export interface Cliente {
   nome: string;
   telefono: string;             // normalizzato, "393331234567"
   note?: string;
+  compleanno?: string;            // "MM-DD" oppure "YYYY-MM-DD" se si sa l'anno
+  taglioAbituale?: string;        // "sfumatura bassa, 2 ai lati" — testo libero, distinto da `note`
+  operatorePreferitoId?: string;
+  auguriFattiAnno?: number;       // anno in cui si sono fatti gli auguri (per non rifarli)
   creatoIl: string; aggiornatoIl: string;
 }
 
@@ -113,6 +117,7 @@ export interface Impostazioni {
   squadra?: MembroSquadra[];    // ritratti in fondo alla barra laterale (solo tablet e PC); mancano = niente ritratti
   messaggiRapidi?: MessaggioRapido[];  // mancano = quelli di src/negozi/<negozio>.ts (come `frasi`)
   testoRiepilogo?: string;             // segnaposto {elenco}; manca = quello del negozio
+  testoAuguri?: string;           // segnaposto {nome}; manca = quello del negozio
 }
 
 /** Un ritratto della squadra: toccandolo dice la sua frase in una nuvoletta. */
@@ -171,6 +176,17 @@ export interface RiepilogoCliente {
   cliente: Cliente; appuntamenti: Appuntamento[];   // futuri non disdetti, dal più vicino
   testo: string; link: string;
 }
+
+export interface RigaCompleanno { cliente: Cliente; data: ISODate; anni?: number; auguriFatti: boolean; link: string }
+export interface SchedaCliente {
+  cliente: Cliente;
+  ultimaVisita?: Appuntamento;    // ultimo passato non disdetto
+  prossimo?: Appuntamento;        // primo futuro non disdetto
+  servizioAbituale?: Servizio; operatoreAbituale?: Operatore;   // i più frequenti nelle visite passate
+  ogniQuantiGiorni?: number;      // mediana dei giorni fra visite, solo con almeno 3 visite
+  debitiAperti: Debito[];
+  compleanno?: RigaCompleanno;    // il prossimo
+}
 ```
 
 ## Funzioni (`src/core/index.ts`)
@@ -197,6 +213,8 @@ sommaMinuti(ora: HHMM, minuti: number): HHMM               // "08:50"+10 -> "09:
 giornoEsteso(data: ISODate): string                         // "martedì 17 novembre"
 componiMessaggioRapido(m: MessaggioRapido, a: Appuntamento, c: Cliente, oggi: ISODate): string
 datePerSerie(inizio: ISODate, r: RegolaSerie): ISODate[]   // `inizio` compreso; al massimo 60 date
+leggiCompleanno(giorno: number, mese: number, anno?: number): string | null   // valida; 30/2 -> null
+prossimoCompleanno(compleanno: string, oggi: ISODate): ISODate                 // 29/2 negli anni non bisestili -> 28/2
 ```
 
 **Regole che i test devono fissare:**
@@ -234,7 +252,12 @@ trovaOCreaCliente(nome: string, telefono: string): Promise<Cliente>  // deduplic
 salvaCliente(c: Cliente): Promise<void>
 storicoCliente(clienteId: string): Promise<Appuntamento[]>
 tuttiIClienti(): Promise<Cliente[]>
+compleanniTra(da: ISODate, a: ISODate): Promise<RigaCompleanno[]>   // estremi inclusi, in ordine di data
+schedaCliente(clienteId: string): Promise<SchedaCliente>
+segnaAuguri(clienteId: string, fatti: boolean): Promise<void>       // true = anno corrente, false = toglie (Annulla)
 ```
+- `compleanniTra`: `link` = `linkWhatsApp` con `testoAuguri` (impostazioni o negozio); `auguriFatti` se
+  `auguriFattiAnno` coincide con l'anno della data del compleanno; `anni` solo se il cliente ha anno di nascita.
 
 ### Appuntamenti e blocchi
 ```ts

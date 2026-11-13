@@ -64,9 +64,18 @@ interface Props {
   onToast?: (t: ToastAzione) => void
   onIniziaScambio?: (a: Appuntamento) => void
   onVaiAData?: (data: ISODate, app: Appuntamento) => void
+  onApriSchedaCliente?: (clienteId: string) => void
 }
 
-export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast, onIniziaScambio, onVaiAData }: Props) {
+export function PannelloAppuntamento({
+  imp,
+  pannello,
+  onChiudi,
+  onToast,
+  onIniziaScambio,
+  onVaiAData,
+  onApriSchedaCliente,
+}: Props) {
   const modifica = isModifica(pannello)
   const esistente = modifica ? pannello.appuntamento : null
 
@@ -462,6 +471,30 @@ export function PannelloAppuntamento({ imp, pannello, onChiudi, onToast, onInizi
             <button type="button" className="btn-primario" onClick={() => void creaCliente()}>
               Aggiungi cliente
             </button>
+          </div>
+        ) : null}
+
+        {clienteSel ? (
+          <div className="pannello-cliente-annotazioni">
+            {clienteSel.taglioAbituale ? (
+              <p className="pannello-taglio-abituale">
+                <strong>Taglio abituale:</strong> {clienteSel.taglioAbituale}
+              </p>
+            ) : null}
+            {clienteSel.note ? (
+              <p className="pannello-note-cliente">
+                <strong>Note cliente:</strong> {clienteSel.note}
+              </p>
+            ) : null}
+            {onApriSchedaCliente ? (
+              <button
+                type="button"
+                className="btn-secondario btn-apri-scheda"
+                onClick={() => onApriSchedaCliente(clienteSel.id)}
+              >
+                Apri scheda
+              </button>
+            ) : null}
           </div>
         ) : null}
 

@@ -209,6 +209,17 @@ export function ImpostazioniSchermata() {
         </section>
 
         <section className="imp-sezione">
+          <h2>Testo auguri di compleanno</h2>
+          <p className="imp-nota">Segnaposto: {'{nome}'}.</p>
+          <textarea
+            className="imp-testo"
+            rows={4}
+            value={imp.testoAuguri ?? ''}
+            onChange={(e) => setImp({ ...imp, testoAuguri: e.target.value })}
+          />
+        </section>
+
+        <section className="imp-sezione">
           <h2>Orari</h2>
           <div className="imp-riga">
             <label>

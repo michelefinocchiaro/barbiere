@@ -15,6 +15,8 @@ import type {
   MessaggioRapido,
   Riepilogo,
   RiepilogoCliente,
+  RigaCompleanno,
+  SchedaCliente,
   RigaDebito,
   RigaPromemoria,
   RisultatoRicerca,
@@ -24,8 +26,27 @@ import type {
 } from './tipi.ts'
 import { FRASI_PREDEFINITE, fraseDelMomento, momentoDellaGiornata } from './frasi.ts'
 import { datePerSerie } from './serie.ts'
+import {
+  addDays,
+  fineMese,
+  etaAlCompleanno,
+  leggiCompleanno,
+  medianaGapGiorni,
+  dataCompleannoInAnno,
+  parseCompleanno,
+  prossimoCompleanno,
+  compleannoNelGiorno,
+} from './compleanni.ts'
 
-export { datePerSerie }
+export {
+  datePerSerie,
+  addDays,
+  fineMese,
+  leggiCompleanno,
+  prossimoCompleanno,
+  compleannoNelGiorno,
+  parseCompleanno,
+}
 
 export type {
   Appuntamento,
@@ -44,9 +65,11 @@ export type {
   Operatore,
   Riepilogo,
   RiepilogoCliente,
+  RigaCompleanno,
   RigaDebito,
   RigaPromemoria,
   RisultatoRicerca,
+  SchedaCliente,
   Servizio,
   RegolaSerie,
   StatoAppuntamento,
@@ -501,6 +524,126 @@ export async function storicoCliente(clienteId: string): Promise<Appuntamento[]>
 
 export async function tuttiIClienti(): Promise<Cliente[]> {
   return db.clienti.orderBy('nome').toArray()
+}
+
+function occorrenzeCompleannoNelRange(compleanno: string, da: ISODate, a: ISODate): ISODate[] {
+  const p = parseCompleanno(compleanno)
+  if (!p) return []
+  const [yDa] = da.split('-').map(Number)
+  const [yA] = a.split('-').map(Number)
+  const out: ISODate[] = []
+  for (let y = yDa; y <= yA; y++) {
+    const data = dataCompleannoInAnno(p.mese, p.giorno, y)
+    if (data && data >= da && data <= a) out.push(data)
+  }
+  return out
+}
+
+async function rigaCompleannoPer(cliente: Cliente, data: ISODate): Promise<RigaCompleanno> {
+  const imp = await leggiImpostazioni()
+  const modello =
+    imp.testoAuguri ?? impostazioniDefault.testoAuguri ?? 'Buon compleanno {nome}!'
+  const testo = componiPromemoria(modello, { nome: cliente.nome })
+  const link = linkWhatsApp(cliente.telefono, testo)
+  const [yOcc] = data.split('-').map(Number)
+  const auguriFatti = cliente.auguriFattiAnno === yOcc
+  const anni = cliente.compleanno ? etaAlCompleanno(cliente.compleanno, data) : undefined
+  return { cliente, data, anni, auguriFatti, link }
+}
+
+export async function compleanniTra(da: ISODate, a: ISODate): Promise<RigaCompleanno[]> {
+  const clienti = await db.clienti.toArray()
+  const righe: RigaCompleanno[] = []
+  for (const c of clienti) {
+    if (!c.compleanno) continue
+    for (const data of occorrenzeCompleannoNelRange(c.compleanno, da, a)) {
+      righe.push(await rigaCompleannoPer(c, data))
+    }
+  }
+  righe.sort((x, y) => (x.data !== y.data ? x.data.localeCompare(y.data) : x.cliente.nome.localeCompare(y.cliente.nome, 'it')))
+  return righe
+}
+
+function moda<T extends string | undefined>(valori: T[]): T | undefined {
+  const conteggio = new Map<string, number>()
+  for (const v of valori) {
+    if (v === undefined) continue
+    conteggio.set(v, (conteggio.get(v) ?? 0) + 1)
+  }
+  let best: string | undefined
+  let max = 0
+  for (const [k, n] of conteggio) {
+    if (n > max) {
+      max = n
+      best = k
+    }
+  }
+  return best as T | undefined
+}
+
+export async function schedaCliente(clienteId: string): Promise<SchedaCliente> {
+  const cliente = await db.clienti.get(clienteId)
+  if (!cliente) throw new Error('Cliente non trovato')
+  const oggiIso = oggi()
+  const imp = await leggiImpostazioni()
+  const apps = await db.appuntamenti.where('clienteId').equals(clienteId).toArray()
+  const attivi = apps.filter((a) => a.stato !== 'disdetto')
+  const passati = attivi
+    .filter((a) => a.data < oggiIso)
+    .sort((a, b) => `${a.data}T${a.ora}`.localeCompare(`${b.data}T${b.ora}`))
+  const futuri = attivi
+    .filter((a) => a.data >= oggiIso)
+    .sort((a, b) => {
+      const cmp = a.data.localeCompare(b.data)
+      return cmp !== 0 ? cmp : a.ora.localeCompare(b.ora)
+    })
+
+  const ultimaVisita = passati.length > 0 ? passati[passati.length - 1] : undefined
+  const prossimo = futuri[0]
+
+  const servizioId = moda(passati.map((a) => a.servizioId))
+  const operatoreId = moda(passati.map((a) => a.operatoreId))
+  const servizioAbituale = servizioId ? imp.servizi.find((s) => s.id === servizioId) : undefined
+  const operatoreAbituale = operatoreId ? imp.operatori.find((o) => o.id === operatoreId) : undefined
+
+  const dateVisite = [...new Set(passati.map((a) => a.data))].sort((a, b) => a.localeCompare(b))
+  const ogniQuantiGiorni = medianaGapGiorni(dateVisite)
+
+  const tuttiDebiti = await debitiCliente(clienteId)
+  const debitiAperti = tuttiDebiti.filter((d) => !d.pagatoIl)
+
+  let compleanno: RigaCompleanno | undefined
+  if (cliente.compleanno) {
+    const data = prossimoCompleanno(cliente.compleanno, oggiIso)
+    compleanno = await rigaCompleannoPer(cliente, data)
+  }
+
+  return {
+    cliente,
+    ultimaVisita,
+    prossimo,
+    servizioAbituale,
+    operatoreAbituale,
+    ogniQuantiGiorni,
+    debitiAperti,
+    compleanno,
+  }
+}
+
+export async function segnaAuguri(clienteId: string, fatti: boolean): Promise<void> {
+  const c = await db.clienti.get(clienteId)
+  if (!c) throw new Error('Cliente non trovato')
+  const now = new Date().toISOString()
+  const [anno] = oggi().split('-').map(Number)
+  const aggiornato: Cliente = {
+    ...c,
+    aggiornatoIl: now,
+    ...(fatti ? { auguriFattiAnno: anno } : {}),
+  }
+  if (!fatti) {
+    delete aggiornato.auguriFattiAnno
+  }
+  await db.clienti.put(aggiornato)
 }
 
 // Appuntamenti e blocchi
@@ -977,6 +1120,9 @@ export async function leggiImpostazioni(): Promise<Impostazioni> {
     if (valore.testoRiepilogo === undefined && impostazioniDefault.testoRiepilogo !== undefined) {
       valore = { ...valore, testoRiepilogo: impostazioniDefault.testoRiepilogo }
     }
+    if (valore.testoAuguri === undefined && impostazioniDefault.testoAuguri !== undefined) {
+      valore = { ...valore, testoAuguri: impostazioniDefault.testoAuguri }
+    }
     return valore
   }
   return { ...impostazioniDefault }
@@ -1126,16 +1272,51 @@ export async function caricaDatiDemo(): Promise<void> {
   const servizio0 = serviziOrd[0]?.id
   const servizio1 = serviziOrd[1]?.id
 
+  const isoOggi = oggi()
+  const mmddOggi = isoOggi.slice(5)
+  const mmddTra3 = addDays(isoOggi, 3).slice(5)
   const clienti: Cliente[] = [
-    { id: crypto.randomUUID(), nome: 'Mario Rossi', telefono: '393330000001', creatoIl: new Date().toISOString(), aggiornatoIl: new Date().toISOString() },
-    { id: crypto.randomUUID(), nome: 'Luigi Bianchi', telefono: '393330000002', creatoIl: new Date().toISOString(), aggiornatoIl: new Date().toISOString() },
-    { id: crypto.randomUUID(), nome: 'Paolo Neri', telefono: '393330000003', creatoIl: new Date().toISOString(), aggiornatoIl: new Date().toISOString() },
-    { id: crypto.randomUUID(), nome: 'Antonio Russo', telefono: '393330000004', creatoIl: new Date().toISOString(), aggiornatoIl: new Date().toISOString() },
+    {
+      id: crypto.randomUUID(),
+      nome: 'Mario Rossi',
+      telefono: '393330000001',
+      compleanno: mmddOggi,
+      taglioAbituale: 'Sfumatura bassa, 2 ai lati',
+      creatoIl: new Date().toISOString(),
+      aggiornatoIl: new Date().toISOString(),
+    },
+    {
+      id: crypto.randomUUID(),
+      nome: 'Luigi Bianchi',
+      telefono: '393330000002',
+      compleanno: mmddTra3,
+      taglioAbituale: 'Classico con forbice sopra',
+      operatorePreferitoId: op1,
+      creatoIl: new Date().toISOString(),
+      aggiornatoIl: new Date().toISOString(),
+    },
+    {
+      id: crypto.randomUUID(),
+      nome: 'Paolo Neri',
+      telefono: '393330000003',
+      compleanno: '02-29',
+      creatoIl: new Date().toISOString(),
+      aggiornatoIl: new Date().toISOString(),
+    },
+    {
+      id: crypto.randomUUID(),
+      nome: 'Antonio Russo',
+      telefono: '393330000004',
+      compleanno: '07-15',
+      creatoIl: new Date().toISOString(),
+      aggiornatoIl: new Date().toISOString(),
+    },
   ]
   await db.clienti.bulkAdd(clienti)
 
   const prossimo = prossimoGiornoApertura(oggi(), imp, [])
   const ts = new Date().toISOString()
+  const oggiAperto = giornoAperto(isoOggi, imp, [])
 
   const appuntamenti: Appuntamento[] = [
     {
@@ -1204,7 +1385,67 @@ export async function caricaDatiDemo(): Promise<void> {
       aggiornatoIl: ts,
     },
   ]
+  if (oggiAperto) {
+    appuntamenti.push({
+      id: crypto.randomUUID(),
+      data: isoOggi,
+      ora: '16:00',
+      durataMin: serviziOrd[0]?.durataMin ?? 30,
+      operatoreId: op0,
+      clienteId: clienti[0]!.id,
+      servizioId: servizio0,
+      stato: 'prenotato',
+      promemoria: 'da_inviare',
+      creatoIl: ts,
+      aggiornatoIl: ts,
+    })
+  }
   await db.appuntamenti.bulkAdd(appuntamenti)
+
+  const passato1 = addDays(isoOggi, -21)
+  const passato2 = addDays(isoOggi, -14)
+  const passato3 = addDays(isoOggi, -7)
+  await db.appuntamenti.bulkAdd([
+    {
+      id: crypto.randomUUID(),
+      data: passato1,
+      ora: '10:00',
+      durataMin: serviziOrd[0]?.durataMin ?? 30,
+      operatoreId: op0,
+      clienteId: clienti[0]!.id,
+      servizioId: servizio0,
+      stato: 'confermato',
+      promemoria: 'non_serve',
+      creatoIl: ts,
+      aggiornatoIl: ts,
+    },
+    {
+      id: crypto.randomUUID(),
+      data: passato2,
+      ora: '10:00',
+      durataMin: serviziOrd[0]?.durataMin ?? 30,
+      operatoreId: op0,
+      clienteId: clienti[0]!.id,
+      servizioId: servizio0,
+      stato: 'confermato',
+      promemoria: 'non_serve',
+      creatoIl: ts,
+      aggiornatoIl: ts,
+    },
+    {
+      id: crypto.randomUUID(),
+      data: passato3,
+      ora: '10:00',
+      durataMin: serviziOrd[0]?.durataMin ?? 30,
+      operatoreId: op0,
+      clienteId: clienti[0]!.id,
+      servizioId: servizio0,
+      stato: 'confermato',
+      promemoria: 'non_serve',
+      creatoIl: ts,
+      aggiornatoIl: ts,
+    },
+  ])
 
   const lunediSettimana = settimanaDi(prossimo)[0]!
   await db.blocchi.add({

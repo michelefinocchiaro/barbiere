@@ -37,6 +37,9 @@ import {
   segnaPagato,
   riepilogoCliente,
   scambiaAppuntamenti,
+  compleanniTra,
+  schedaCliente,
+  segnaAuguri,
   settimanaDi,
   spostaAppuntamento,
   svuotaTutto,
@@ -489,6 +492,7 @@ describe('backup', () => {
       squadra: impostazioniNegozio.squadra,
       messaggiRapidi: impostazioniNegozio.messaggiRapidi,
       testoRiepilogo: impostazioniNegozio.testoRiepilogo,
+      testoAuguri: impostazioniNegozio.testoAuguri,
     }
     await salvaImpostazioni(impConTutto)
 
@@ -996,5 +1000,72 @@ describe('caricaDatiDemo', () => {
 
     await svuotaTutto()
     expect(await db.debiti.toArray()).toHaveLength(0)
+  })
+})
+
+describe('compleanniTra', () => {
+  it('ordina per data e attraversa capodanno', async () => {
+    await svuotaTutto()
+    const c: Cliente = {
+      id: 'cmp1',
+      nome: 'Gennaio Demo',
+      telefono: '393330000010',
+      compleanno: '01-05',
+      creatoIl: new Date().toISOString(),
+      aggiornatoIl: new Date().toISOString(),
+    }
+  await salvaCliente(c)
+    const righe = await compleanniTra('2025-12-20', '2026-01-10')
+    expect(righe.map((r) => r.data)).toEqual(['2026-01-05'])
+    expect(righe[0].link).toContain('phone=393330000010')
+  })
+
+  it('auguri segnati e annullati', async () => {
+    await svuotaTutto()
+    const c: Cliente = {
+      id: 'cmp2',
+      nome: 'Auguri Demo',
+      telefono: '393330000011',
+      compleanno: '11-13',
+      creatoIl: new Date().toISOString(),
+      aggiornatoIl: new Date().toISOString(),
+    }
+    await salvaCliente(c)
+    await segnaAuguri(c.id, true)
+    let righe = await compleanniTra('2026-11-13', '2026-11-13')
+    expect(righe[0].auguriFatti).toBe(true)
+    await segnaAuguri(c.id, false)
+    righe = await compleanniTra('2026-11-13', '2026-11-13')
+    expect(righe[0].auguriFatti).toBe(false)
+  })
+})
+
+describe('schedaCliente', () => {
+  it('mediana visite e ultima volta mancante', async () => {
+    await svuotaTutto()
+    const c: Cliente = {
+      id: 'sch1',
+      nome: 'Scheda Nuova',
+      telefono: '393330000012',
+      creatoIl: new Date().toISOString(),
+      aggiornatoIl: new Date().toISOString(),
+    }
+    await salvaCliente(c)
+    let s = await schedaCliente(c.id)
+    expect(s.ultimaVisita).toBeUndefined()
+    expect(s.ogniQuantiGiorni).toBeUndefined()
+
+    await salvaAppuntamento(
+      app({ clienteId: c.id, data: '2026-10-20', ora: '09:00', durataMin: 30, operatoreId: op1 }),
+    )
+    await salvaAppuntamento(
+      app({ clienteId: c.id, data: '2026-10-27', ora: '09:00', durataMin: 30, operatoreId: op1 }),
+    )
+    await salvaAppuntamento(
+      app({ clienteId: c.id, data: '2026-11-03', ora: '09:00', durataMin: 30, operatoreId: op1 }),
+    )
+    s = await schedaCliente(c.id)
+    expect(s.ultimaVisita?.data).toBe('2026-11-03')
+    expect(s.ogniQuantiGiorni).toBe(7)
   })
 })

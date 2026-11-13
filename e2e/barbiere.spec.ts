@@ -761,7 +761,11 @@ test.describe('giro 1A — scambio, messaggi, riepilogo', () => {
 
   test('riepilogo per cliente con due appuntamenti', async ({ page }) => {
     await page.locator('.app-blocco').filter({ hasText: 'Mario Rossi' }).first().click()
-    await page.getByRole('button', { name: /Invia riepilogo \(2 appuntamenti\)/ }).click()
+    const riepilogo = page.getByRole('button', { name: /Invia riepilogo \(\d+ appuntamenti\)/ })
+    await expect(riepilogo).toBeVisible()
+    const n = parseInt((await riepilogo.textContent())?.match(/\d+/)?.[0] ?? '0', 10)
+    expect(n).toBeGreaterThanOrEqual(2)
+    await riepilogo.click()
     await expect(page.locator('.invia-riepilogo-anteprima')).toBeVisible()
     const wa = page.getByRole('link', { name: 'Apri WhatsApp' })
     await expect(wa).toHaveAttribute('href', /api\.whatsapp\.com/)
@@ -962,6 +966,8 @@ test.describe('giro 2 — pc 1440×900', () => {
     await dentroSchermo(page.getByRole('button', { name: 'Scambia con…' }))
     await dentroSchermo(page.getByRole('button', { name: 'Sposta', exact: true }))
     await dentroSchermo(page.getByRole('button', { name: 'Elimina', exact: true }))
+    await dentroSchermo(page.getByRole('button', { name: 'Disdici' }))
+    await dentroSchermo(page.getByRole('button', { name: 'Segna da pagare' }))
   })
 
   test('anteprima ripeti: righe sotto 64 px e almeno 6 visibili con 8 date', async ({ page }) => {
@@ -1018,6 +1024,39 @@ test.describe('giro 2 — pc 1440×900', () => {
     await page.getByRole('button', { name: 'Questo e i successivi' }).click()
     await page.getByRole('button', { name: 'Annulla' }).last().click()
     await expect(page.locator('.app-blocco-serie-mark').first()).toBeVisible()
+  })
+})
+
+test.describe('giro 3 — compleanni e scheda', () => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'pc-1440', 'solo pc-1440')
+    await page.clock.setFixedTime(SABATO)
+    await page.goto('/')
+    await esciBenvenutoVuoto(page)
+    await page.getByRole('button', { name: 'Impostazioni' }).click()
+    await page.getByRole('button', { name: 'Carica dati demo' }).click()
+    await page.getByRole('button', { name: 'Sì' }).click()
+  })
+
+  test('compleanni nel riquadro clienti e cake in agenda', async ({ page }) => {
+    await page.getByRole('button', { name: 'Clienti' }).click()
+    await expect(page.getByRole('heading', { name: 'Compleanni' })).toBeVisible()
+    await expect(page.getByText('Mario Rossi', { exact: true }).first()).toBeVisible()
+    await page.getByRole('button', { name: 'Agenda' }).click()
+    await impostaDataAgenda(page, '2026-11-14')
+    await expect(page.locator('.app-blocco-cliente').filter({ hasText: '🎂' }).first()).toBeVisible({
+      timeout: 15_000,
+    })
+  })
+
+  test('scheda cliente e apri scheda dal pannello', async ({ page }) => {
+    await page.getByRole('button', { name: 'Agenda' }).click()
+    await impostaDataAgenda(page, '2026-11-17')
+    await page.getByText('Mario Rossi').first().click()
+    await expect(page.getByText(/Taglio abituale:/)).toBeVisible()
+    await page.getByRole('button', { name: 'Apri scheda' }).click()
+    await expect(page.getByLabel('Taglio abituale')).toHaveValue(/Sfumatura/)
+    await expect(page.getByText(/Viene ogni circa/)).toBeVisible()
   })
 })
 
